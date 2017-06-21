@@ -12,7 +12,7 @@ use hyper::{Body, Chunk};
 
 use futures::future;
 use futures::future::{Either, Map, FutureResult};
-use futures::stream::Concat;
+use futures::stream::Concat2;
 use futures::Future;
 
 
@@ -35,7 +35,7 @@ impl Service for LoadBalancingHandler {
     // resolve to. This can change to whatever Future you need.
     type Future = Either<
         FutureResult<Self::Response, Self::Error>,
-        Map<Concat<Body>, fn(Chunk) -> Self::Response>
+        Map<Concat2<Body>, fn(Chunk) -> Self::Response>
     >;
 
     fn call(&self, req: Self::Request) -> Self::Future {
@@ -49,7 +49,7 @@ impl Service for LoadBalancingHandler {
             },
             (&Method::Post, "/echo") => {
                 Either::B(req.body()
-                             .concat()
+                             .concat2()
                              .map(reverse))
             },
             _ => {
