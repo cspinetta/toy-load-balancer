@@ -1,135 +1,94 @@
 
 extern crate hyper;
 extern crate futures;
+extern crate tokio_core;
 
 use hyper::header::ContentLength;
 use hyper::server::{Http, Request, Response, Service};
 use hyper::{Method, StatusCode};
 
 use std::ascii::AsciiExt;
-use futures::Stream;
+use futures::{Stream, Future};
 use hyper::{Body, Chunk};
 
 use futures::future;
 use futures::future::{Either, Map, FutureResult};
 use futures::stream::Concat2;
-use futures::Future;
+
+use std::io::{self, Write};
+use hyper::Client;
+use tokio_core::reactor::Core;
+use tokio_core::reactor::Handle;
+
+use tokio_core::net::TcpListener;
+
+use hyper::Uri;
 
 
 fn main() {
-    println!("Hello, world!");
+    println!("Starting Load Balancer...");
+
     let addr = "127.0.0.1:3000".parse().unwrap();
-    let server = Http::new().bind(&addr, || Ok(LoadBalancingHandler)).unwrap();
-    server.run().unwrap();
+
+    let http = Http::new();
+    let mut core = Core::new().unwrap();
+    let handle = core.handle();
+
+    let listener = TcpListener::bind(&addr, &handle).unwrap();
+
+    let server = listener.incoming()
+        .for_each(|(sock, addr)| {
+            let service = Proxy { handle: handle.clone() };
+            http.bind_connection(&handle, sock, addr, service);
+            Ok(())
+        });
+
+    core.run(server).unwrap();
 }
 
-const PHRASE: &'static str = "Hello, World!";
+struct Proxy {
+    handle: Handle
+}
 
-struct LoadBalancingHandler;
+impl Proxy {
 
-impl Service for LoadBalancingHandler {
-    type Request = Request;
-    type Response = Response;
-    type Error = hyper::Error;
-    // The future representing the eventual Response your call will
-    // resolve to. This can change to whatever Future you need.
-    type Future = Either<
-        FutureResult<Self::Response, Self::Error>,
-        Map<Concat2<Body>, fn(Chunk) -> Self::Response>
-    >;
-
-    fn call(&self, req: Self::Request) -> Self::Future {
-        match (req.method(), req.path()) {
-            (&Method::Get, "/health-check") => {
-
-                let response = Response::new()
-                        .with_header(ContentLength(PHRASE.len() as u64))
-                        .with_body(PHRASE);
-                Either::A(futures::future::ok(response))
-            },
-            (&Method::Post, "/echo") => {
-                Either::B(req.body()
-                             .concat2()
-                             .map(reverse))
-            },
-            _ => {
-                Either::A(future::ok(Response::new().with_status(StatusCode::NotFound)))
-            }
-        }
+    fn create_proxy_url(&self, host: &str, uri: Uri) -> Uri {
+        format!("{}{}{}", host, uri.path(), uri.query().unwrap_or("")).parse().unwrap()
     }
 }
 
-fn reverse(chunk: Chunk) -> Response {
-    let reversed = chunk.iter()
-        .rev()
-        .cloned()
-        .collect::<Vec<u8>>();
-    Response::new()
-        .with_body(reversed)
+impl Service for Proxy {
+    type Request = Request;
+    type Response = Response;
+    type Error = hyper::Error;
+    type Future = Box<Future<Item=Self::Response, Error = Self::Error>>;
+
+    fn call(&self, req: Self::Request) -> Self::Future {
+        let method = req.method().clone();
+        let uri = self.create_proxy_url("http://reddit.com", req.uri().clone());
+
+        let mut client_req = Request::new(method, uri);
+        client_req.headers_mut().extend(req.headers().iter());
+        client_req.set_body(req.body());
+
+        println!("Request: {:?}", client_req);
+
+        let client = Client::new(&self.handle);
+        let resp = client.request(client_req)
+            .then(move |result| {
+                match result {
+                    Ok(client_resp) => {
+                        Ok(Response::new()
+                            .with_status(client_resp.status())
+                            .with_headers(client_resp.headers().clone())
+                            .with_body(client_resp.body()))
+                    }
+                    Err(e) => {
+                        println!("{:?}", &e);
+                        Err(e)
+                    }
+                }
+            });
+        Box::new(resp)
+    }
 }
-
-//fn to_uppercase(chunk: Chunk) -> Chunk {
-//    let uppered = chunk.iter()
-//        .map(|byte| byte.to_ascii_uppercase())
-//        .collect::<Vec<u8>>();
-//    Chunk::from(uppered)
-//}
-
-
-//#[macro_use]
-//extern crate serde_derive;
-//
-//extern crate futures_cpupool;
-//extern crate tokio_proto;
-//extern crate tokio_minihttp;
-//extern crate futures;
-//extern crate rand;
-//extern crate serde;
-//extern crate serde_json;
-//extern crate tokio_service;
-//
-//use std::io;
-//
-//use futures::{BoxFuture, Future};
-//use futures_cpupool::CpuPool;
-//use rand::Rng;
-//use tokio_minihttp::{Request, Response};
-//use tokio_proto::TcpServer;
-//use tokio_service::Service;
-
-//fn main() {
-////    println!("Hello, world!");
-////
-////    let addr = "0.0.0.0:8080".parse().unwrap();
-////
-////    let thread_pool = CpuPool::new(10);
-////
-////    TcpServer::new(tokio_minihttp::Http, addr).serve(move || {
-////        Ok(Server {
-////            thread_pool: thread_pool.clone(),
-////        })
-////    })
-//}
-
-//struct Server {
-//    thread_pool: CpuPool
-//}
-//
-//impl Service for Server {
-//    type Error = io::Error;
-//    type Future = BoxFuture<Response, io::Error>;
-//    type Request = Request;
-//    type Response = Response;
-//
-//    fn call(&self, req: Self::Request) -> Self::Future {
-//        assert_eq!(req.path(), "/db");
-//        let random_id = rand::thread_rng().gen_range(1, 5);
-//        unimplemented!()
-//    }
-//}
-//
-//#[derive(Serialize)]
-//struct Message {
-//    id: i32,
-//    body: String,
-//}
