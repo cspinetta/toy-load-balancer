@@ -1,3 +1,5 @@
+#[macro_use] extern crate log;
+extern crate pretty_env_logger;
 
 extern crate hyper;
 extern crate futures;
@@ -27,7 +29,9 @@ use hyper::error::UriError;
 
 
 fn main() {
-    println!("Starting Load Balancer...");
+    pretty_env_logger::init().unwrap();
+
+    info!("Starting Load Balancer...");
 
     let addr = "127.0.0.1:3000".parse().unwrap();
 
@@ -73,7 +77,7 @@ impl Service for Proxy {
         client_req.headers_mut().extend(req.headers().iter());
         client_req.set_body(req.body());
 
-        println!("Request: {:?}", client_req);
+        info!("Dispatching incoming connection: {:?}", client_req);
 
         let client = Client::new(&self.handle);
         let resp = client.request(client_req)
@@ -86,7 +90,7 @@ impl Service for Proxy {
                             .with_body(client_resp.body()))
                     }
                     Err(e) => {
-                        println!("{:?}", &e);
+                        error!("{:?}", &e);
                         Err(e)
                     }
                 }

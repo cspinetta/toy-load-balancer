@@ -5,6 +5,10 @@ authors = ["Cristian Spinetta <cebs91@gmail.com>"]
 
 [dependencies]
 
+log = "0.3"
+#env_logger="0.4.3"
+pretty_env_logger = "0.1"
+
 hyper = "0.11"
 
 # basic dependencies from echo server before
