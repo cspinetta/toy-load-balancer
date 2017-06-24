@@ -23,6 +23,7 @@ use tokio_core::reactor::Handle;
 use tokio_core::net::TcpListener;
 
 use hyper::Uri;
+use hyper::error::UriError;
 
 
 fn main() {
@@ -52,8 +53,8 @@ struct Proxy {
 
 impl Proxy {
 
-    fn create_proxy_url(&self, host: &str, uri: Uri) -> Uri {
-        format!("{}{}{}", host, uri.path(), uri.query().unwrap_or("")).parse().unwrap()
+    fn create_proxy_url(&self, host: &str, uri: Uri) -> Result<Uri, UriError> {
+        format!("{}{}{}", host, uri.path(), uri.query().unwrap_or("")).parse()
     }
 }
 
@@ -65,7 +66,8 @@ impl Service for Proxy {
 
     fn call(&self, req: Self::Request) -> Self::Future {
         let method = req.method().clone();
-        let uri = self.create_proxy_url("http://reddit.com", req.uri().clone());
+        let uri = self.create_proxy_url("http://reddit.com", req.uri().clone())
+            .expect(&format!("Failed trying to parse uri. Origin: {:?}", &req.uri()));
 
         let mut client_req = Request::new(method, uri);
         client_req.headers_mut().extend(req.headers().iter());
