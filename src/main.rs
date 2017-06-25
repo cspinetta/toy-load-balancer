@@ -70,7 +70,8 @@ impl Service for Proxy {
 
     fn call(&self, req: Self::Request) -> Self::Future {
         let method = req.method().clone();
-        let uri = self.create_proxy_url("http://reddit.com", req.uri().clone())
+        let host = "http://localhost:8000";
+        let uri = self.create_proxy_url(host, req.uri().clone())
             .expect(&format!("Failed trying to parse uri. Origin: {:?}", &req.uri()));
 
         let mut client_req = Request::new(method, uri);
@@ -84,10 +85,11 @@ impl Service for Proxy {
             .then(move |result| {
                 match result {
                     Ok(client_resp) => {
-                        Ok(Response::new()
-                            .with_status(client_resp.status())
-                            .with_headers(client_resp.headers().clone())
-                            .with_body(client_resp.body()))
+                        Ok(client_resp)
+//                        Ok(Response::new()
+//                            .with_status(client_resp.status())
+//                            .with_headers(client_resp.headers().clone())
+//                            .with_body(client_resp.body()))
                     }
                     Err(e) => {
                         error!("{:?}", &e);
