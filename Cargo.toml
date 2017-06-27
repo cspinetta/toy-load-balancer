@@ -17,6 +17,8 @@ tokio-core = "0.1"
 tokio-proto = "0.1"
 tokio-service = "0.1"
 
+tokio-pool = "0.1"
+
 # our toy HTTP implementation
 tokio-minihttp = { git = "https://github.com/tokio-rs/tokio-minihttp" }
 

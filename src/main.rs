@@ -4,6 +4,7 @@ extern crate pretty_env_logger;
 extern crate hyper;
 extern crate futures;
 extern crate tokio_core;
+extern crate tokio_pool;
 
 use hyper::header::ContentLength;
 use hyper::server::{Http, Request, Response, Service};
@@ -27,33 +28,75 @@ use tokio_core::net::TcpListener;
 use hyper::Uri;
 use hyper::error::UriError;
 
+use tokio_pool::TokioPool;
+use std::sync::Arc;
+
+use std::net::SocketAddr;
+use std::cell::RefCell;
+use std::mem;
+use std::borrow::Borrow;
+
 
 fn main() {
     pretty_env_logger::init().unwrap();
 
-    info!("Starting Load Balancer...");
+    let (pool, join) = TokioPool::new(4)
+        .expect("Failed to create event loop");
 
-    let addr = "127.0.0.1:3000".parse().unwrap();
+    let addr: SocketAddr = "0.0.0.0:8080".parse().unwrap();
 
-    let http = Http::new();
-    let mut core = Core::new().unwrap();
-    let handle = core.handle();
+    let pool: Arc<TokioPool> = Arc::new(pool);
+    let pool_ref: Arc<TokioPool> = pool.clone();
 
-    let listener = TcpListener::bind(&addr, &handle).unwrap();
+    // Use the first pool worker to listen for connections
+    pool.next_worker().spawn(move |handle| {
 
-    let server = listener.incoming()
-        .for_each(|(sock, addr)| {
-            let service = Proxy { handle: handle.clone() };
-            http.bind_connection(&handle, sock, addr, service);
+        // Bind a TCP listener to our address
+        let listener = TcpListener::bind(&addr, handle).unwrap();
+
+//        let c = service;
+
+        // Listen for incoming clients
+        listener.incoming().for_each(move |(socket, addr)| {
+
+            let new_pool_ref = pool_ref.clone();
+            let service = Arc::new(Proxy { pool_ref: new_pool_ref.clone() });
+
+            new_pool_ref.next_worker().spawn(move |handle| {
+                Arc::new(Http::new()).bind_connection(&handle.clone(), socket, addr, service);
+                Ok(())
+            });
+
             Ok(())
-        });
+        }).map_err(|err| {
+            error!("Error with TcpListener: {:?}", err);
+        })
+    });
 
-    core.run(server).unwrap();
+    join.join();
 }
 
+#[derive(Clone)]
 struct Proxy {
-    handle: Handle
+    pool_ref: Arc<TokioPool>
 }
+
+//fn single_thread() {
+//    info!("Starting Load Balancer...");
+//    let addr = "127.0.0.1:3000".parse().unwrap();
+//    let http: Http<Chunk> = Http::new();
+//    let mut core = Core::new().unwrap();
+//
+//    let handle = core.handle();
+//    let listener = TcpListener::bind(&addr, &handle).unwrap();
+//    let server = listener.incoming()
+//        .for_each(|(sock, addr)| {
+//            let service = Proxy { handle: handle.clone() };
+//            http.bind_connection(&handle, sock, addr, service);
+//            Ok(())
+//        });
+//    core.run(server).unwrap();
+//}
 
 impl Proxy {
 
@@ -70,7 +113,7 @@ impl Service for Proxy {
 
     fn call(&self, req: Self::Request) -> Self::Future {
         let method = req.method().clone();
-        let host = "http://localhost:8000";
+        let host = "http://localhost:8000"; // other host
         let uri = self.create_proxy_url(host, req.uri().clone())
             .expect(&format!("Failed trying to parse uri. Origin: {:?}", &req.uri()));
 
@@ -80,7 +123,9 @@ impl Service for Proxy {
 
         info!("Dispatching incoming connection: {:?}", client_req);
 
-        let client = Client::new(&self.handle);
+        let new_handler = self.pool_ref.next_worker().handle().unwrap().clone();
+
+        let client = Client::new(&new_handler);
         let resp = client.request(client_req)
             .then(move |result| {
                 match result {
