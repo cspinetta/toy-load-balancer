@@ -36,6 +36,8 @@ use std::cell::RefCell;
 use std::mem;
 use std::borrow::Borrow;
 
+use futures::sync::oneshot;
+
 
 fn main() {
     pretty_env_logger::init().unwrap();
@@ -90,36 +92,59 @@ impl Service for Proxy {
     type Future = Box<Future<Item=Self::Response, Error = Self::Error>>;
 
     fn call(&self, req: Self::Request) -> Self::Future {
-        let method = req.method().clone();
-        let host = "http://localhost:8000"; // other host
-        let uri = self.create_proxy_url(host, req.uri().clone())
-            .expect(&format!("Failed trying to parse uri. Origin: {:?}", &req.uri()));
 
-        let mut client_req = Request::new(method, uri);
-        client_req.headers_mut().extend(req.headers().iter());
-        client_req.set_body(req.body());
+        let (tx, rx) = oneshot::channel();
 
-        info!("Dispatching incoming connection: {:?}", client_req);
+        self.pool_ref.next_worker().spawn(move |handle| {
+            let method = req.method().clone();
+            let host = "http://localhost:8000"; // other host
+            let uri = self.create_proxy_url(host, req.uri().clone())
+                .expect(&format!("Failed trying to parse uri. Origin: {:?}", &req.uri()));
 
-        let new_handler = self.pool_ref.next_worker().handle().unwrap().clone();
+            let mut client_req = Request::new(method, uri);
+            client_req.headers_mut().extend(req.headers().iter());
+            client_req.set_body(req.body());
 
-        let client = Client::new(&new_handler);
-        let resp = client.request(client_req)
-            .then(move |result| {
-                match result {
-                    Ok(client_resp) => {
-                        Ok(client_resp)
-//                        Ok(Response::new()
-//                            .with_status(client_resp.status())
-//                            .with_headers(client_resp.headers().clone())
-//                            .with_body(client_resp.body()))
+            info!("Dispatching incoming connection: {:?}", client_req);
+
+//            let new_handler = self.pool_ref.next_worker().handle().unwrap().clone();
+
+            let client = Client::new(&handle);
+            let resp = client.request(client_req);
+            let resp = resp
+                .then(move |result| {
+                    match result {
+                        Ok(client_resp) => {
+                            tx.complete(Ok(client_resp));
+                            Ok(client_resp)
+    //                        Ok(Response::new()
+    //                            .with_status(client_resp.status())
+    //                            .with_headers(client_resp.headers().clone())
+    //                            .with_body(client_resp.body()))
+                        }
+                        Err(e) => {
+                            error!("{:?}", &e);
+                            tx.complete(Err(e));
+                            Err(e)
+                        }
                     }
-                    Err(e) => {
-                        error!("{:?}", &e);
-                        Err(e)
-                    }
-                }
-            });
-        Box::new(resp)
+//                })
+//                .then(move |result| {
+//                    tx.complete(result);
+//                    result
+                });
+            Ok(())
+        });
+
+//        Box::new(resp)
+//        let final_response: Box<Future<Item=Self::Response, Error = Self::Error>> = rx.then(|result| {
+//            match result {
+//                Ok(v) => Ok(v),
+//                Err(e) => Err("error")
+//            }
+//        }).boxed();
+////        Box::new(final_response)
+//        final_response
+        rx.then(|r| r.unwrap()).boxed()
     }
 }
