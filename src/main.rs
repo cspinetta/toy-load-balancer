@@ -6,37 +6,19 @@ extern crate futures;
 extern crate tokio_core;
 extern crate tokio_pool;
 
-use hyper::header::ContentLength;
 use hyper::server::{Http, Request, Response, Service};
-use hyper::{Method, StatusCode};
+use hyper::StatusCode;
 
-use std::ascii::AsciiExt;
 use futures::{Stream, Future};
-use hyper::{Body, Chunk};
+use hyper::Body;
 
-use futures::future;
-use futures::future::{Either, Map, FutureResult};
-use futures::stream::Concat2;
-
-use std::io::{self, Write};
 use hyper::Client;
 use tokio_core::reactor::Core;
-use tokio_core::reactor::Handle;
 
 use tokio_core::net::TcpListener;
 
 use hyper::Uri;
 use hyper::error::UriError;
-
-use tokio_pool::TokioPool;
-use std::sync::Arc;
-
-use std::net::SocketAddr;
-use std::cell::RefCell;
-use std::mem;
-use std::borrow::Borrow;
-
-use futures::sync::oneshot;
 use hyper::client::HttpConnector;
 
 
@@ -63,7 +45,7 @@ fn server_start_up() {
             Http::new().bind_connection(&handle.clone(), socket, addr, service);
             Ok(())
         }).map_err(|err| {
-            error!("Error with TcpListener: {:?}", err);
+            error!("Error with Tcp Listener: {:?}", err);
         });
 
     core.run(server).unwrap();
@@ -96,7 +78,7 @@ impl Service for Proxy {
         client_req.headers_mut().extend(req.headers().iter());
         client_req.set_body(req.body());
 
-        info!("Dispatching incoming connection: {:?}", client_req);
+        info!("Dispatching request: {:?}", client_req);
 
         let resp = self.client.request(client_req).then(move |result| {
             match result {
@@ -109,7 +91,6 @@ impl Service for Proxy {
                 }
             }
         });
-        info!("it's here!!!!!");
 
         Box::new(resp) as Self::Future
     }
