@@ -52,7 +52,6 @@ fn server_start_up() {
 
     let addr = "127.0.0.1:3000".parse().unwrap();
     info!("Starting Load Balancer on {:?}...", addr);
-//    let http: Http<Chunk> = Http::new();
     let mut server_event_loop = Core::new().expect("Create Server Event Loop");
     let mut client_event_loop = Arc::new(Core::new().expect("Create Client Event Loop"));
 
@@ -72,7 +71,6 @@ fn server_start_up() {
             error!("Error with TcpListener: {:?}", err);
         });
 
-//    server_event_loop.join(client_event_loop_ref).run(server).unwrap();
     server_event_loop.run(server).unwrap();
 }
 
