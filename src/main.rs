@@ -37,6 +37,7 @@ use std::mem;
 use std::borrow::Borrow;
 
 use futures::sync::oneshot;
+use hyper::client::HttpConnector;
 
 
 fn main() {
@@ -45,37 +46,31 @@ fn main() {
 }
 
 fn server_start_up() {
-    let (pool, join) = TokioPool::new(4).expect("Failed to create event loop");
-
-    let pool: Arc<TokioPool> = Arc::new(pool);
-    let pool_ref: Arc<TokioPool> = pool.clone();
 
     let addr = "127.0.0.1:3000".parse().unwrap();
     info!("Starting Load Balancer on {:?}...", addr);
-    let mut server_event_loop = Core::new().expect("Create Server Event Loop");
-    let mut client_event_loop = Arc::new(Core::new().expect("Create Client Event Loop"));
+    let mut core = Core::new().expect("Create Server Event Loop");
 
-    let mut client_event_loop_ref = client_event_loop.clone();
+    let handle = core.handle();
+    let client = Client::new(&handle);
 
-    let handle = server_event_loop.handle();
-    let handle_ref = server_event_loop.handle();
 
     let listener = TcpListener::bind(&addr, &handle).unwrap();
     let server = listener
         .incoming()
         .for_each(|(socket, addr)| {
-            let service = Proxy { };
-            Http::new().bind_connection(&handle_ref.clone(), socket, addr, service);
+            let service = Proxy { client: client.clone() };
+            Http::new().bind_connection(&handle.clone(), socket, addr, service);
             Ok(())
         }).map_err(|err| {
             error!("Error with TcpListener: {:?}", err);
         });
 
-    server_event_loop.run(server).unwrap();
+    core.run(server).unwrap();
 }
 
 struct Proxy {
-//    client_event_loop: Core
+    client: Client<HttpConnector, Body>
 }
 
 impl Proxy {
@@ -93,11 +88,7 @@ impl Service for Proxy {
 
     fn call(&self, req: Self::Request) -> Self::Future {
 
-        let (tx, rx) = oneshot::channel();
-
-        let mut client_event_loop = Core::new().expect("Create Client Event Loop");
-
-        let host = "http://localhost:8000"; // other host
+        let host = "http://localhost:9290"; // other host
         let uri = self.create_proxy_url(host, req.uri().clone())
             .expect(&format!("Failed trying to parse uri. Origin: {:?}", &req.uri()));
 
@@ -107,37 +98,19 @@ impl Service for Proxy {
 
         info!("Dispatching incoming connection: {:?}", client_req);
 
-        let handle = client_event_loop.handle().clone();
-
-        let client = Client::new(&handle);
-
-        let resp = client.request(client_req).then(move |result| {
+        let resp = self.client.request(client_req).then(move |result| {
             match result {
                 Ok(client_resp) => {
-                    info!("Response from client: {:?}", &client_resp);
-                    tx.send(Ok(client_resp));
-                    Ok(())
+                    futures::future::ok(client_resp)
                 }
                 Err(e) => {
                     error!("{:?}", &e);
-                    tx.send(Err(e));
-                    Err(())
+                    futures::future::ok(Response::new().with_status(StatusCode::ServiceUnavailable))
                 }
             }
         });
         info!("it's here!!!!!");
-        client_event_loop.run(resp);
 
-        rx
-            .then(|result| {
-                match result {
-                    Ok(f) => f,
-                    Err(canceled) => {
-                        error!("Client canceled: {:?}", &canceled);
-                        Ok(Response::new())
-                    }
-                }
-            })
-            .boxed()
+        Box::new(resp) as Self::Future
     }
 }
