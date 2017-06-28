@@ -44,11 +44,6 @@ fn main() {
     server_start_up();
 }
 
-#[derive(Clone)]
-struct Proxy {
-    pool_ref: Arc<TokioPool>
-}
-
 fn server_start_up() {
     let (pool, join) = TokioPool::new(4).expect("Failed to create event loop");
 
@@ -58,24 +53,31 @@ fn server_start_up() {
     let addr = "127.0.0.1:3000".parse().unwrap();
     info!("Starting Load Balancer on {:?}...", addr);
 //    let http: Http<Chunk> = Http::new();
-    let mut core = Core::new().unwrap();
+    let mut server_event_loop = Core::new().expect("Create Server Event Loop");
+    let mut client_event_loop = Arc::new(Core::new().expect("Create Client Event Loop"));
 
-//    let handle = core.handle();
-    let listener = TcpListener::bind(&addr, &core.handle()).unwrap();
+    let mut client_event_loop_ref = client_event_loop.clone();
+
+    let handle = server_event_loop.handle();
+    let handle_ref = server_event_loop.handle();
+
+    let listener = TcpListener::bind(&addr, &handle).unwrap();
     let server = listener
         .incoming()
         .for_each(|(socket, addr)| {
-            let service = Arc::new(Proxy { pool_ref: pool_ref.clone() });
-            pool_ref.next_worker().spawn(move |handle| {
-                Arc::new(Http::new()).bind_connection(&handle.clone(), socket, addr, service);
-                Ok(())
-            });
-
+            let service = Proxy { };
+            Http::new().bind_connection(&handle_ref.clone(), socket, addr, service);
             Ok(())
         }).map_err(|err| {
             error!("Error with TcpListener: {:?}", err);
         });
-    core.run(server).unwrap();
+
+//    server_event_loop.join(client_event_loop_ref).run(server).unwrap();
+    server_event_loop.run(server).unwrap();
+}
+
+struct Proxy {
+//    client_event_loop: Core
 }
 
 impl Proxy {
@@ -95,9 +97,7 @@ impl Service for Proxy {
 
         let (tx, rx) = oneshot::channel();
 
-//        let req_ref = Arc::new(req);
-
-        let method = req.method().clone();
+        let mut client_event_loop = Core::new().expect("Create Client Event Loop");
 
         let host = "http://localhost:8000"; // other host
         let uri = self.create_proxy_url(host, req.uri().clone())
@@ -107,39 +107,28 @@ impl Service for Proxy {
         client_req.headers_mut().extend(req.headers().iter());
         client_req.set_body(req.body());
 
-        self.pool_ref.next_worker().spawn(move |handle| {
+        info!("Dispatching incoming connection: {:?}", client_req);
 
-            info!("Dispatching incoming connection: {:?}", client_req);
+        let handle = client_event_loop.handle().clone();
 
-//            let new_handler = self.pool_ref.next_worker().handle().unwrap().clone();
+        let client = Client::new(&handle);
 
-            let client = Client::new(&handle);
-            let resp = client.request(client_req).then(move |result| {
-                match result {
-                    Ok(client_resp) => {
-                        info!("Response from client: {:?}", &client_resp);
-                        tx.complete(Ok(client_resp));
-                        Ok(())
-//                        Ok(Response::new()
-//                            .with_status(client_resp.status())
-//                            .with_headers(client_resp.headers().clone())
-//                            .with_body(client_resp.body()))
-                    }
-                    Err(e) => {
-                        error!("{:?}", &e);
-                        tx.complete(Err(e));
-                        Err("error")
-                    }
+        let resp = client.request(client_req).then(move |result| {
+            match result {
+                Ok(client_resp) => {
+                    info!("Response from client: {:?}", &client_resp);
+                    tx.send(Ok(client_resp));
+                    Ok(())
                 }
-//                })
-//                .then(move |result| {
-//                    tx.complete(result);
-//                    result
-                });
-            Ok(())
+                Err(e) => {
+                    error!("{:?}", &e);
+                    tx.send(Err(e));
+                    Err(())
+                }
+            }
         });
-
-//        rx.and_then(|client_result| { client_result });
+        info!("it's here!!!!!");
+        client_event_loop.run(resp);
 
         rx
             .then(|result| {
