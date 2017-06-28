@@ -95,39 +95,42 @@ impl Service for Proxy {
 
         let (tx, rx) = oneshot::channel();
 
-        self.pool_ref.next_worker().spawn(move |handle| {
-            let method = req.method().clone();
-            let host = "http://localhost:8000"; // other host
-            let uri = self.create_proxy_url(host, req.uri().clone())
-                .expect(&format!("Failed trying to parse uri. Origin: {:?}", &req.uri()));
+//        let req_ref = Arc::new(req);
 
-            let mut client_req = Request::new(method, uri);
-            client_req.headers_mut().extend(req.headers().iter());
-            client_req.set_body(req.body());
+        let method = req.method().clone();
+
+        let host = "http://localhost:8000"; // other host
+        let uri = self.create_proxy_url(host, req.uri().clone())
+            .expect(&format!("Failed trying to parse uri. Origin: {:?}", &req.uri()));
+
+        let mut client_req = Request::new(req.method().clone(), uri);
+        client_req.headers_mut().extend(req.headers().iter());
+        client_req.set_body(req.body());
+
+        self.pool_ref.next_worker().spawn(move |handle| {
 
             info!("Dispatching incoming connection: {:?}", client_req);
 
 //            let new_handler = self.pool_ref.next_worker().handle().unwrap().clone();
 
             let client = Client::new(&handle);
-            let resp = client.request(client_req);
-            let resp = resp
-                .then(move |result| {
-                    match result {
-                        Ok(client_resp) => {
-                            tx.complete(Ok(client_resp));
-                            Ok(client_resp)
-    //                        Ok(Response::new()
-    //                            .with_status(client_resp.status())
-    //                            .with_headers(client_resp.headers().clone())
-    //                            .with_body(client_resp.body()))
-                        }
-                        Err(e) => {
-                            error!("{:?}", &e);
-                            tx.complete(Err(e));
-                            Err(e)
-                        }
+            let resp = client.request(client_req).then(move |result| {
+                match result {
+                    Ok(client_resp) => {
+                        info!("Response from client: {:?}", &client_resp);
+                        tx.complete(Ok(client_resp));
+                        Ok(())
+//                        Ok(Response::new()
+//                            .with_status(client_resp.status())
+//                            .with_headers(client_resp.headers().clone())
+//                            .with_body(client_resp.body()))
                     }
+                    Err(e) => {
+                        error!("{:?}", &e);
+                        tx.complete(Err(e));
+                        Err("error")
+                    }
+                }
 //                })
 //                .then(move |result| {
 //                    tx.complete(result);
@@ -136,15 +139,18 @@ impl Service for Proxy {
             Ok(())
         });
 
-//        Box::new(resp)
-//        let final_response: Box<Future<Item=Self::Response, Error = Self::Error>> = rx.then(|result| {
-//            match result {
-//                Ok(v) => Ok(v),
-//                Err(e) => Err("error")
-//            }
-//        }).boxed();
-////        Box::new(final_response)
-//        final_response
-        rx.then(|r| r.unwrap()).boxed()
+//        rx.and_then(|client_result| { client_result });
+
+        rx
+            .then(|result| {
+                match result {
+                    Ok(f) => f,
+                    Err(canceled) => {
+                        error!("Client canceled: {:?}", &canceled);
+                        Ok(Response::new())
+                    }
+                }
+            })
+            .boxed()
     }
 }
