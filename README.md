@@ -10,10 +10,14 @@ Written in [Rust] language.
 cargo run
 ```
 
-**Some curl's examples:**
+**Some tests:**
+
+For now, a simple way to test the app is [start a server with python](https://docs.python.org/3/library/http.server.html): `python3 -m http.server 9290` , then start the app and do some requests:
 
 ```bash
-curl -i X POST -H "Content-Type: application/json" -d '{"key1": "value1"}' 'http://localhost:3000/echo'
+curl -i 'http://localhost:3000/'
+
+curl -i 'http://localhost:3000/path/to/files'
 ```
 
 [Rust]:https://www.rust-lang.org/en-US/index.html
