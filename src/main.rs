@@ -30,7 +30,8 @@ fn main() {
 fn server_start_up() {
 
     let addr = "127.0.0.1:3000".parse().unwrap();
-    info!("Starting Load Balancer on {:?}...", addr);
+
+    info!("Starting Server on {:?}...", addr);
     let mut core = Core::new().expect("Create Server Event Loop");
 
     let handle = core.handle();
@@ -70,7 +71,7 @@ impl Service for Proxy {
 
     fn call(&self, req: Self::Request) -> Self::Future {
 
-        let host = "http://localhost:9290"; // other host
+        let host = "http://localhost:9000"; // other host
         let uri = self.create_proxy_url(host, req.uri().clone())
             .expect(&format!("Failed trying to parse uri. Origin: {:?}", &req.uri()));
 
@@ -81,15 +82,14 @@ impl Service for Proxy {
         info!("Dispatching request: {:?}", client_req);
 
         let resp = self.client.request(client_req).then(move |result| {
-            match result {
-                Ok(client_resp) => {
-                    futures::future::ok(client_resp)
-                }
+            let response = match result {
+                Ok(client_resp) => client_resp,
                 Err(e) => {
                     error!("{:?}", &e);
-                    futures::future::ok(Response::new().with_status(StatusCode::ServiceUnavailable))
+                    Response::new().with_status(StatusCode::ServiceUnavailable)
                 }
-            }
+            };
+            futures::future::ok(response)
         });
 
         Box::new(resp) as Self::Future
