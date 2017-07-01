@@ -1,10 +1,14 @@
-#[macro_use] extern crate log;
+#[macro_use]
+extern crate log;
 extern crate pretty_env_logger;
 
 extern crate hyper;
 extern crate futures;
 extern crate tokio_core;
 extern crate tokio_pool;
+extern crate num_cpus;
+
+extern crate net2;
 
 use hyper::server::{Http, Request, Response, Service};
 use hyper::StatusCode;
@@ -16,40 +20,72 @@ use hyper::Client;
 use tokio_core::reactor::Core;
 
 use tokio_core::net::TcpListener;
+use std::thread;
+use std::sync::Arc;
+use std::net::SocketAddr;
 
 use hyper::Uri;
 use hyper::error::UriError;
 use hyper::client::HttpConnector;
 
+use net2::unix::UnixTcpBuilderExt;
+
 
 fn main() {
     pretty_env_logger::init().unwrap();
-    server_start_up();
+    start_server();
 }
+fn start_server() {
 
-fn server_start_up() {
-
-    let addr = "127.0.0.1:3000".parse().unwrap();
+    let addr = "127.0.0.1:3000".parse::<SocketAddr>().unwrap();
 
     info!("Starting Server on {:?}...", addr);
-    let mut core = Core::new().expect("Create Server Event Loop");
 
-    let handle = core.handle();
-    let client = Client::new(&handle);
+    let mut threads = Vec::new();
+    for _ in 0..num_cpus::get() {
+        //        let listener = listener.try_clone().unwrap();
+        threads.push(thread::spawn(move || {
+            let server = Server{ addr: &addr };
+            server.start();
+        }));
+    }
 
+    for t in threads {
+        t.join().unwrap();
+    }
+}
 
-    let listener = TcpListener::bind(&addr, &handle).unwrap();
-    let server = listener
-        .incoming()
-        .for_each(|(socket, addr)| {
+struct Server<'a> {
+    addr: &'a SocketAddr,
+//    service: &'a Proxy,
+}
+
+impl<'a> Server<'a> {
+
+    fn start(self) {
+
+        let mut core = Core::new().expect("Create Event Loop");
+
+        let handle = core.handle();
+
+        let client = Client::new(&handle);
+
+        let listener = net2::TcpBuilder::new_v4().unwrap()
+            .reuse_port(true).unwrap()
+            .bind(self.addr).unwrap()
+            .listen(128).unwrap();
+        let listener = TcpListener::from_listener(listener, self.addr, &handle).unwrap();
+
+        let all_conns = listener.incoming().for_each(|(socket, addr)| {
             let service = Proxy { client: client.clone() };
-            Http::new().bind_connection(&handle.clone(), socket, addr, service);
+            Http::new().bind_connection(&handle, socket, addr, service);
             Ok(())
         }).map_err(|err| {
             error!("Error with Tcp Listener: {:?}", err);
         });
 
-    core.run(server).unwrap();
+        core.run(all_conns).unwrap();
+    }
 }
 
 struct Proxy {
