@@ -26,12 +26,13 @@ fn main() {
 
 fn start_server() {
 
-    let addr = "127.0.0.1:3000".parse::<SocketAddr>().unwrap();
+    let addr = "0.0.0.0:3000".parse::<SocketAddr>().unwrap();
 
     let router = Arc::new(Router::new());
 
     let mut threads = Vec::new();
-    for _ in 0..num_cpus::get() {
+    let n_threads = num_cpus::get();
+    for _ in 0..n_threads {
         let router_ref = router.clone();
         threads.push(thread::spawn(move || {
             let server = Server::new(&addr, router_ref.clone());
@@ -39,7 +40,7 @@ fn start_server() {
         }));
     }
 
-    info!("Server started at {:?}...", addr);
+    info!("Listening on http://{} with {} threads...", addr, n_threads);
 
     for t in threads {
         t.join().unwrap();

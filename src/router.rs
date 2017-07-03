@@ -72,7 +72,7 @@ impl Router {
 
     pub fn map_req(&self, req: Request) -> Request {
 
-        let host = "http://localhost:9000"; // other host
+        let host = "http://localhost:3001"; // other host
         let uri = self.create_url(host, req.uri().clone())
             .expect(&format!("Failed trying to parse uri. Origin: {:?}", &req.uri()));
 
