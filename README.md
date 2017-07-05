@@ -20,7 +20,7 @@ curl -i 'http://localhost:3000/'
 curl -i 'http://localhost:3000/path/to/files'
 ```
 
-## About some design decisions and selected technology
+## Design decisions and selected technology
 Sigamos en español para facilitar la evaluación =)
 
 **Por la naturaleza del caso de uso, los aspectos que más valoramos son:**
