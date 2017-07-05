@@ -28,7 +28,7 @@ Sigamos en español para facilitar la evaluación =)
 - Mínimo overhead entre el cliente y el host final.
 - Capacidad para escalar en volumen de carga.
 - Bajo footprint.
-- Idealmente uso de sockets non-blocking (dado qeu el problema es IO bound).
+- Idealmente uso de sockets non-blocking (dado que el problema es IO bound).
 
 
 ### Tecnología usada:
