@@ -37,7 +37,7 @@ Valoramos varias estrategias y tecnologías: actores con Elixir, Ruby con Puma, 
 
 **Finalmente elegimos [Rust]. Los motivos fueron:**
 
-- Es de bastante bajo nivel (se acerca bastante a C), pero con muchas validaciones por el compilador y muchos features de lenguajes de alto nivel.
+- Es de bajo nivel (se acerca bastante a C), lo cual permite ~~reducir~~ manejar mejor las alocaciones en memoria, y a pesar de eso, provee muchas validaciones desde el compilador y muchos features de lenguajes de alto nivel.
 - No usa GC, sino que el compilador introduce el pedido y liberación de memoria, a través de un concepto que llamaron [Ownership].
 - Hay librerias para IO bastante maduras: [MIO] para manejo de primitivas non-blocking y [Tokio] para manejo de conexiones.
 
@@ -56,7 +56,7 @@ Valoramos varias estrategias y tecnologías: actores con Elixir, Ruby con Puma, 
 
 ### Arquitectura implementada
 
-Implementamos una arquitectura basada en un _grupo de event loops_ (por default la misma cantidad de core de la máquina host), y cada event loop implementa la misma lógica: escuchar conexiones TCP en un puerto, resolver el protocolo HTTP, decidir a que host redireccionar y hacer la conexión con el host final, para luego propagar la respuesta de este al cliente inicial. La solución está pensada para correr sobre un sistema _Unix_ y kernel >= 3.9, para aprovechar la opción [SO_REUSEPORT] que permite abrir N sockets asociados al mismo puerto, de esta manera tenemos N event loops, todos escuchando el mismo puerto.
+Implementamos una arquitectura basada en un _grupo de event loops_ (por default la misma cantidad de core de la máquina host), y cada event loop implementa la misma lógica: escuchar conexiones TCP en un puerto, resolver el protocolo HTTP, decidir a que host redireccionar y hacer la conexión con el host final, para luego propagar la respuesta de este al cliente inicial. La solución está pensada para correr sobre un sistema _Unix_ y _kernel >= 3.9_, para aprovechar la opción [SO_REUSEPORT] que permite abrir N sockets asociados al mismo puerto, de esta manera tenemos N event loops, todos escuchando el mismo puerto.
 
 ## License
 
