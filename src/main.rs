@@ -15,6 +15,7 @@ use std::sync::Arc;
 
 mod router;
 mod server;
+mod file_utils;
 
 use server::Server;
 use router::Router;
