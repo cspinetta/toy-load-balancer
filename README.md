@@ -30,6 +30,9 @@ Sigamos en español para facilitar la evaluación =)
 - Bajo footprint.
 - Idealmente uso de sockets non-blocking (dado qeu el problema es IO bound).
 
+
+### Tecnología usada:
+
 Valoramos varias estrategias y tecnologías: actores con Elixir, Ruby con Puma, Go, Rust, ~~C++~~.
 
 **Finalmente elegimos [Rust]. Los motivos fueron:**
@@ -51,10 +54,17 @@ Valoramos varias estrategias y tecnologías: actores con Elixir, Ruby con Puma, 
 - Aún no hay un buen soporte para el IDE.
 - En general las librerias están muy verdes.
 
-Bien, veamos si superamos la prueba o morimos en el intento...
+### Arquitectura implementada
+
+Implementamos una arquitectura basada en un _grupo de event loops_ (por default la misma cantidad de core de la máquina host), y cada event loop implementa la misma lógica: escuchar conexiones TCP en un puerto, resolver el protocolo HTTP, decidir a que host redireccionar y hacer la conexión con el host final, para luego propagar la respuesta de este al cliente inicial. La solución está pensada para correr sobre un sistema _Unix_ y kernel >= 3.9, para aprovechar la opción [SO_REUSEPORT] que permite abrir N sockets asociados al mismo puerto, de esta manera tenemos N event loops, todos escuchando el mismo puerto.
+
+## License
+
+MIT
 
 [Ownership]:https://doc.rust-lang.org/book/second-edition/ch04-00-understanding-ownership.html
 [Lifetime]:https://doc.rust-lang.org/book/second-edition/ch10-03-lifetime-syntax.html
 [MIO]:https://github.com/carllerche/mio
 [Tokio]:https://github.com/tokio-rs/tokio-core
 [Rust]:https://www.rust-lang.org/en-US/index.html
+[SO_REUSEPORT]:https://lwn.net/Articles/542629/
