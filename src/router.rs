@@ -14,18 +14,19 @@ use hyper::error::UriError;
 use hyper::client::HttpConnector;
 
 use std::sync::Arc;
-use file_utils::FileReader;
+use std::io::{self, Write};
 
 #[derive(Clone)]
 pub struct Proxy {
     pub client: Client<HttpConnector, Body>,
     pub router: Arc<Router>,
+    pub redireccion: String,
 }
 
 impl Proxy {
 
-    pub fn new(client: Client<HttpConnector, Body>, router: Arc<Router>) -> Proxy {
-        Proxy { client, router }
+    pub fn new(client: Client<HttpConnector, Body>, router: Arc<Router>, redireccion: String) -> Proxy {
+        Proxy { client, router, redireccion }
     }
 }
 
@@ -37,7 +38,7 @@ impl Service for Proxy {
 
     fn call(&self, req: Self::Request) -> Self::Future {
 
-        let forwarded_req = self.router.map_req(req);
+        let forwarded_req = self.router.map_req(req, self.redireccion.clone());
 
         info!("Dispatching request: {:?}", forwarded_req);
 
@@ -58,7 +59,6 @@ impl Service for Proxy {
 
 #[derive(Clone)]
 pub struct Router {
-
 }
 
 impl Router {
@@ -71,12 +71,12 @@ impl Router {
         format!("{}{}{}", host, uri.path(), uri.query().unwrap_or("")).parse()
     }
 
-    pub fn map_req(&self, req: Request) -> Request {
-    	// Get file from config.
-		let file_properties = FileReader::read().unwrap();
-		let host = &file_properties.get(0).unwrap().1;  // .0=property, .1=value
-		//	TODO add host redirect logic. Hosts should be retrieved from config file
-        let uri = self.create_url(host, req.uri().clone())
+    pub fn map_req(&self, req: Request, host: String) -> Request {
+
+        //let host = "http://localhost:3001"; // other host
+        //let host = "http://www.google.com"; // other host
+
+        let uri = self.create_url(&host, req.uri().clone())
             .expect(&format!("Failed trying to parse uri. Origin: {:?}", &req.uri()));
 
         let mut forwarded_req = Request::new(req.method().clone(), uri);
