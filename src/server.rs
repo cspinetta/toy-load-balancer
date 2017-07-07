@@ -52,7 +52,7 @@ impl<'a> Server<'a> {
 
             self.channel.tx.send(self.id.to_string());
 
-            let redireccion = self.channel.rx.recv_timeout(Duration::from_millis(50)).unwrap();
+            let redireccion = self.channel.rx.recv().unwrap();//(Duration::from_millis(50)).unwrap();
 
             if (redireccion.is_empty() || redireccion == ""){
 

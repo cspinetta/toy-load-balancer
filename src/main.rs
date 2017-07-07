@@ -9,6 +9,8 @@ extern crate tokio_core;
 extern crate num_cpus;
 extern crate net2;
 
+extern crate ipc_channel;
+
 use std::thread;
 use std::net::SocketAddr;
 use std::sync::Arc;
