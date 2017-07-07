@@ -15,7 +15,7 @@ pub fn server_manager(channel_vector : Vec<duplex::DuplexStream>) {
 
     let properties = FileReader::read().unwrap();
     for i in 0..properties.len(){
-    	availables_servers.push(properties[i].clone());
+    	availables_servers.push(properties[i].1.clone());
     }
 
     loop {

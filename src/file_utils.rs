@@ -9,7 +9,7 @@ pub struct FileReader{
 impl FileReader{
 	// INPUT  -> FILE, property=value, e.g. host1=http://localhost:3001
 	// OUTPUT -> [(property1,value1),...,(propertyN,valueN)]
-	pub fn read() -> Result<Vec<String>> {
+	pub fn read() -> Result<Vec<(String,String)>> {
 	    let mut properties = Vec::new();
 		let file = File::open("config-file.txt")?; 
 		let reader = BufReader::new(file);
@@ -17,7 +17,7 @@ impl FileReader{
 	        let mut property = String::from(line.unwrap());
 	        let token_index = property.find('=').unwrap()+1;
 	        let value = property.split_off(token_index);
-	        properties.push(value);
+	        properties.push((property,value));
 	    }
 	    Ok(properties)
 	}	
