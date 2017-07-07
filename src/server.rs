@@ -15,24 +15,23 @@ use tokio_core::net::TcpListener;
 use std::net::SocketAddr;
 
 use net2::unix::UnixTcpBuilderExt;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 use router::Proxy;
 use router::Router;
+use server_manager::HostResolver;
 use std::time::Duration;
 //use std::time;
 
 pub struct Server<'a> {
     addr: &'a SocketAddr,
-    router:  Arc<Router>,
-    channel: duplex::DuplexStream,
-    id: usize,
+    host_resolver:  Arc<Mutex<HostResolver>>,
 }
 
 impl<'a> Server<'a> {
 
-    pub fn new(addr: &'a SocketAddr, router:  Arc<Router>, channel: duplex::DuplexStream, id: usize) -> Server<'a> {
-        Server { addr: addr, router: router, channel: channel, id: id }
+    pub fn new(addr: &'a SocketAddr, host_resolver:  Arc<Mutex<HostResolver>>) -> Server<'a> {
+        Server { addr: addr, host_resolver: host_resolver }
     }
 
     pub fn start(self) {
@@ -50,18 +49,18 @@ impl<'a> Server<'a> {
 
         let all_conns = listener.incoming().for_each(|(socket, addr)| {
 
-            self.channel.tx.send(self.id.to_string());
+//            self.channel.tx.send(self.id.to_string());
+//
+//            let dest_host = self.channel.rx.recv().unwrap();//(Duration::from_millis(50)).unwrap();
 
-            let redireccion = self.channel.rx.recv().unwrap();//(Duration::from_millis(50)).unwrap();
+//            if (dest_host.is_empty() || dest_host == ""){
+//
+//                //salir con error
+//            }
 
-            if (redireccion.is_empty() || redireccion == ""){
+            //self.channel.tx.send(dest_host.clone());
 
-                //salir con error
-            }
-
-            //self.channel.tx.send(redireccion.clone());
-
-            let service = Proxy::new(Client::new(&handle), self.router.clone(), redireccion);
+            let service = Proxy::new(Client::new(&handle), self.host_resolver.clone());
 
             Http::new().bind_connection(&handle, socket, addr, service.clone());
             Ok(())

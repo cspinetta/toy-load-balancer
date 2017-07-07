@@ -10,20 +10,22 @@ use hyper::client::HttpConnector;
 use hyper::error::UriError;
 use hyper::Get;
 
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use std::io::{self, Write};
+
+use server_manager::HostResolver;
 
 #[derive(Clone)]
 pub struct Proxy {
     pub client: Client<HttpConnector, Body>,
-    pub router: Arc<Router>,
-    pub redireccion: String,
+    pub host_resolver: Arc<Mutex<HostResolver>>,
+//    pub dest_host: String,
 }
 
 impl Proxy {
 
-    pub fn new(client: Client<HttpConnector, Body>, router: Arc<Router>, redireccion: String) -> Proxy {
-        Proxy { client, router, redireccion }
+    pub fn new(client: Client<HttpConnector, Body>, host_resolver: Arc<Mutex<HostResolver>>) -> Proxy {
+        Proxy { client, host_resolver }
     }
 }
 
@@ -36,19 +38,20 @@ impl Service for Proxy {
     fn call(&self, req: Self::Request) -> Self::Future {
 //        let ref_router = self.router.clone();
         info!("Dispatching request: {:?}", &req);
-        Router::new().dispatch_request(&self.client, req, 1)
+        Router::new(self.host_resolver.clone()).dispatch_request(&self.client, req, 1)
     }
 }
 
 #[derive(Clone)]
 pub struct Router {
-    max_retry: Arc<u32>
+    max_retry: Arc<u32>,
+    host_resolver: Arc<Mutex<HostResolver>>
 }
 
 impl Router {
 
-    pub fn new() -> Router {
-        Router { max_retry: Arc::new(3) }
+    pub fn new(host_resolver: Arc<Mutex<HostResolver>>) -> Router {
+        Router { max_retry: Arc::new(3), host_resolver: host_resolver }
     }
 
     fn clone_req(req: &Request) -> Request {
@@ -57,25 +60,32 @@ impl Router {
         new_req
     }
 
+    fn clone_req_custom_uri(req: &Request, uri: &Uri) -> Request {
+        let mut new_req = Request::new(req.method().clone(), uri.clone());
+        new_req.headers_mut().extend(req.headers().iter());
+        new_req
+    }
+
     fn create_url(host: &str, uri: Uri) -> Result<Uri, UriError> {
         format!("{}{}{}", host, uri.path(), uri.query().unwrap_or("")).parse()
     }
 
-    fn map_req(req: Request) -> Request {
-        let host = "http://localhost:3001"; // other host
+    fn map_req(&self, req: Request) -> Request {
+        let host = self.host_resolver.lock().unwrap().get_next(); // "http://localhost:3001"; // other host
+        info!("host: {}", host);
         let uri = Self::create_url(host, req.uri().clone())
             .expect(&format!("Failed trying to parse uri. Origin: {:?}", &req.uri()));
-        Self::clone_req(&req)
+        Self::clone_req_custom_uri(&req, &uri)
     }
 
     fn dispatch_request(self, client: &Client<HttpConnector, Body>, req: Request<Body>, n_retry: u32) -> Box<Future<Error=hyper::Error, Item=Response>>
     {
-        info!("Attemp {}", n_retry);
-
         let client_clone = client.clone();
         let ref_max = self.max_retry.clone();
 
-        let cloned_req = Self::map_req(Self::clone_req(&req));
+        let cloned_req = self.map_req(Self::clone_req(&req));
+
+        info!("Attemp {} for url: {:?}", n_retry, cloned_req);
 
         let resp = client.request(Self::clone_req(&cloned_req)).then(move |result| {
             debug!("Max retry: {}. Current attemp: {}", ref_max.clone(), n_retry);
