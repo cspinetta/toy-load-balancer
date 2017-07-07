@@ -1,17 +1,14 @@
 extern crate hyper;
 extern crate futures;
 
-use hyper::server::{Request, Response, Service};
-use hyper::StatusCode;
-
 use futures::Future;
-use hyper::Body;
+use futures::future::FutureResult;
 
-use hyper::Client;
-
-use hyper::Uri;
-use hyper::error::UriError;
+use hyper::{Client, Body, Uri, StatusCode};
+use hyper::server::{Request, Response, Service};
 use hyper::client::HttpConnector;
+use hyper::error::UriError;
+use hyper::Get;
 
 use std::sync::Arc;
 
@@ -35,50 +32,72 @@ impl Service for Proxy {
     type Future = Box<Future<Item=Self::Response, Error = Self::Error>>;
 
     fn call(&self, req: Self::Request) -> Self::Future {
-
-        let forwarded_req = self.router.map_req(req);
-
-        info!("Dispatching request: {:?}", forwarded_req);
-
-        let resp = self.client.request(forwarded_req).then(move |result| {
-            let response = match result {
-                Ok(client_resp) => client_resp,
-                Err(e) => {
-                    error!("{:?}", &e);
-                    Response::new().with_status(StatusCode::ServiceUnavailable)
-                }
-            };
-            futures::future::ok(response)
-        });
-
-        Box::new(resp) as Self::Future
+//        let ref_router = self.router.clone();
+        info!("Dispatching request: {:?}", &req);
+        Router::new().dispatch_request(&self.client, req, 1)
     }
 }
 
 #[derive(Clone)]
 pub struct Router {
-
+    max_retry: Arc<u32>
 }
 
 impl Router {
 
     pub fn new() -> Router {
-        Router {}
+        Router { max_retry: Arc::new(3) }
     }
 
-    fn create_url(&self, host: &str, uri: Uri) -> Result<Uri, UriError> {
+    fn clone_req(req: &Request) -> Request {
+        let mut new_req = Request::new(req.method().clone(), req.uri().clone());
+        new_req.headers_mut().extend(req.headers().iter());
+        new_req
+    }
+
+    fn create_url(host: &str, uri: Uri) -> Result<Uri, UriError> {
         format!("{}{}{}", host, uri.path(), uri.query().unwrap_or("")).parse()
     }
 
-    pub fn map_req(&self, req: Request) -> Request {
-
+    fn map_req(req: Request) -> Request {
         let host = "http://localhost:3001"; // other host
-        let uri = self.create_url(host, req.uri().clone())
+        let uri = Self::create_url(host, req.uri().clone())
             .expect(&format!("Failed trying to parse uri. Origin: {:?}", &req.uri()));
+        Self::clone_req(&req)
+    }
 
-        let mut forwarded_req = Request::new(req.method().clone(), uri);
-        forwarded_req.headers_mut().extend(req.headers().iter());
-        forwarded_req.set_body(req.body());
-        forwarded_req
+    fn dispatch_request(self, client: &Client<HttpConnector, Body>, req: Request<Body>, n_retry: u32) -> Box<Future<Error=hyper::Error, Item=Response>>
+    {
+        info!("Attemp {}", n_retry);
+
+        let client_clone = client.clone();
+        let ref_max = self.max_retry.clone();
+
+        let cloned_req = Self::map_req(Self::clone_req(&req));
+
+        let resp = client.request(Self::clone_req(&cloned_req)).then(move |result| {
+            debug!("Max retry: {}. Current attemp: {}", ref_max.clone(), n_retry);
+            match result {
+                Ok(client_resp) => {
+                    if client_resp.status() == hyper::StatusCode::Ok {
+                        Box::new(futures::future::ok(client_resp))
+                    } else if n_retry < *ref_max.clone() {
+                        self.dispatch_request(&client_clone, Self::clone_req(&cloned_req), n_retry + 1)
+                    } else {
+                        Box::new(futures::future::ok(Response::new().with_status(StatusCode::ServiceUnavailable)))
+                    }
+                },
+                Err(e) => {
+                    println!("Connection error: {:?}", &e);
+                    if n_retry < *ref_max.clone() {
+                        self.dispatch_request(&client_clone, Self::clone_req(&cloned_req), n_retry + 1)
+                    } else {
+                        Box::new(futures::future::ok(Response::new().with_status(StatusCode::ServiceUnavailable)))
+                    }
+
+                }
+            }
+        });
+        Box::new(resp)
     }
 }
