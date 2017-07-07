@@ -17,6 +17,7 @@ mod router;
 mod server;
 mod duplex;
 mod server_manager;
+mod file_utils;
 
 use server::Server;
 use router::Router;

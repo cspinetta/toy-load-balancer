@@ -4,14 +4,19 @@ use duplex;
 use std::io::{self, Write};
 use std::sync::mpsc::{TryRecvError};
 use server_manager::rand::Rng;
+use file_utils::FileReader;
 
 pub fn server_manager(channel_vector : Vec<duplex::DuplexStream>) {
 
-    //Falta levantar la configuracion
     //let estrategia = "RR"; //RoundRobin
     let estrategia = "RN";//Random
     let mut ultimo_elegido = 0;
-    let servidores_habilitados = vec!["http://192.0.0.1", "http://192.0.0.2", "http://192.0.0.3", "http://192.0.0.4"];
+    let mut availables_servers = Vec::new();
+
+    let properties = FileReader::read().unwrap();
+    for i in 0..properties.len(){
+    	availables_servers.push(properties[i].clone());
+    }
 
     loop {
 
@@ -28,9 +33,9 @@ pub fn server_manager(channel_vector : Vec<duplex::DuplexStream>) {
                        "RR"=>{
 
                            println! ("{:?}", ultimo_elegido);
-                           channel_vector[i].tx.send(servidores_habilitados[ultimo_elegido].to_string());
+                           channel_vector[i].tx.send(availables_servers[ultimo_elegido].to_string());
 
-                           if (ultimo_elegido >= servidores_habilitados.len() - 1)
+                           if (ultimo_elegido >= availables_servers.len() - 1)
                            {
                                ultimo_elegido = 0;
                            }
@@ -42,10 +47,10 @@ pub fn server_manager(channel_vector : Vec<duplex::DuplexStream>) {
 
                        "RN" | _=>{
 
-                           //let num = rand::thread_rng().gen_range( 0, servidores_habilitados.len() - 1);
-                           let mut num = self::rand::thread_rng().gen_range(0, servidores_habilitados.len() - 1);
+                           //let num = rand::thread_rng().gen_range( 0, availables_servers.len() - 1);
+                           let mut num = self::rand::thread_rng().gen_range(0, availables_servers.len() - 1);
 
-                           channel_vector[i].tx.send(servidores_habilitados[num].to_string());
+                           channel_vector[i].tx.send(availables_servers[num].to_string());
                        }
                     }
                 }
