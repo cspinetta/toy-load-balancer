@@ -20,14 +20,14 @@ pub fn server_manager(channel_vector : Vec<duplex::DuplexStream>) {
             let value = channel_vector[i].rx.try_recv();
             match value {
                 Ok(id) => {
-                    println!("Valor: {}", id);
+                    info!("Valor: {}", id);
 
                     //estrategia de asignacion de servers
                     match estrategia
                     {
                        "RR"=>{
 
-                           println! ("{:?}", ultimo_elegido);
+                           info! ("Last selected: {:?}", ultimo_elegido);
                            channel_vector[i].tx.send(servidores_habilitados[ultimo_elegido].to_string());
 
                            if (ultimo_elegido >= servidores_habilitados.len() - 1)
@@ -51,12 +51,12 @@ pub fn server_manager(channel_vector : Vec<duplex::DuplexStream>) {
                 }
                 Err(TryRecvError::Empty) => {
                     //No hay nada para recibir
+//                    info!("No hay nada...")
                 }
                 Err(TryRecvError::Disconnected) => unreachable!(),
             }
         }
 
-        io::stdout().flush().expect("flushed");
         /*
         let pp : String  = channel_vector[0].rx.recv().unwrap();
 

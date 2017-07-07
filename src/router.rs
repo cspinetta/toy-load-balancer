@@ -90,7 +90,7 @@ impl Router {
                     }
                 },
                 Err(e) => {
-                    println!("Connection error: {:?}", &e);
+                    error!("Connection error: {:?}", &e);
                     if n_retry < *ref_max.clone() {
                         self.dispatch_request(&client_clone, Self::clone_req(&cloned_req), n_retry + 1)
                     } else {

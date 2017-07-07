@@ -27,7 +27,7 @@ fn main() {
 
     let args: Vec<_> = env::args().collect();
 
-    println!("Arguments supplied: {:?}", args[1]);
+    info!("Arguments supplied: {:?}", args[1]);
     if args.len() < 1 {
         panic!("Please supply address to listen connections");
     }

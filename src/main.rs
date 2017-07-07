@@ -25,8 +25,7 @@ use std::io::{self, Write};
 fn main() {
     pretty_env_logger::init().unwrap();
 
-    println!("starting server");
-    io::stdout().flush().expect("flushed");
+    info!("Starting server...");
 
     start_server();
 }
@@ -55,8 +54,6 @@ fn start_server() {
         }));
     }
 
-    println!("Listening on http://{} with {} threads...", addr, n_threads);
-    io::stdout().flush().expect("flushed");
     info!("Listening on http://{} with {} threads...", addr, n_threads);
 
     threads.push(thread::spawn(move || {
