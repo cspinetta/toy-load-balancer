@@ -11,17 +11,19 @@ use hyper::error::UriError;
 use hyper::Get;
 
 use std::sync::Arc;
+use std::io::{self, Write};
 
 #[derive(Clone)]
 pub struct Proxy {
     pub client: Client<HttpConnector, Body>,
     pub router: Arc<Router>,
+    pub redireccion: String,
 }
 
 impl Proxy {
 
-    pub fn new(client: Client<HttpConnector, Body>, router: Arc<Router>) -> Proxy {
-        Proxy { client, router }
+    pub fn new(client: Client<HttpConnector, Body>, router: Arc<Router>, redireccion: String) -> Proxy {
+        Proxy { client, router, redireccion }
     }
 }
 
