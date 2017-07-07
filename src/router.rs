@@ -2,7 +2,7 @@ extern crate hyper;
 extern crate futures;
 
 use futures::Future;
-use futures::future::FutureResult;
+use futures::future::ok as FutureOk;
 
 use hyper::{Client, Body, Uri, StatusCode};
 use hyper::server::{Request, Response, Service};
@@ -19,7 +19,6 @@ use server_manager::HostResolver;
 pub struct Proxy {
     pub client: Client<HttpConnector, Body>,
     pub host_resolver: Arc<Mutex<HostResolver>>,
-//    pub dest_host: String,
 }
 
 impl Proxy {
@@ -36,7 +35,6 @@ impl Service for Proxy {
     type Future = Box<Future<Item=Self::Response, Error = Self::Error>>;
 
     fn call(&self, req: Self::Request) -> Self::Future {
-//        let ref_router = self.router.clone();
         info!("Dispatching request: {:?}", &req);
         Router::new(self.host_resolver.clone()).dispatch_request(&self.client, req, 1)
     }
@@ -71,8 +69,7 @@ impl Router {
     }
 
     fn map_req(&self, req: Request) -> Request {
-        let host = self.host_resolver.lock().unwrap().get_next(); // "http://localhost:3001"; // other host
-        info!("host: {}", host);
+        let host = self.host_resolver.lock().unwrap().get_next();
         let uri = Self::create_url(host, req.uri().clone())
             .expect(&format!("Failed trying to parse uri. Origin: {:?}", &req.uri()));
         Self::clone_req_custom_uri(&req, &uri)
@@ -92,11 +89,11 @@ impl Router {
             match result {
                 Ok(client_resp) => {
                     if client_resp.status() == hyper::StatusCode::Ok {
-                        Box::new(futures::future::ok(client_resp))
+                        Box::new(FutureOk(client_resp))
                     } else if n_retry < *ref_max.clone() {
                         self.dispatch_request(&client_clone, Self::clone_req(&cloned_req), n_retry + 1)
                     } else {
-                        Box::new(futures::future::ok(Response::new().with_status(StatusCode::ServiceUnavailable)))
+                        Box::new(FutureOk(Response::new().with_status(StatusCode::ServiceUnavailable)))
                     }
                 },
                 Err(e) => {
@@ -104,7 +101,7 @@ impl Router {
                     if n_retry < *ref_max.clone() {
                         self.dispatch_request(&client_clone, Self::clone_req(&cloned_req), n_retry + 1)
                     } else {
-                        Box::new(futures::future::ok(Response::new().with_status(StatusCode::ServiceUnavailable)))
+                        Box::new(FutureOk(Response::new().with_status(StatusCode::ServiceUnavailable)))
                     }
 
                 }

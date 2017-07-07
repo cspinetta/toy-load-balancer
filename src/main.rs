@@ -18,7 +18,6 @@ use std::sync::Mutex;
 
 mod router;
 mod server;
-mod duplex;
 mod server_manager;
 
 use server_manager::HostResolver;
@@ -37,22 +36,13 @@ fn main() {
 fn start_server() {
 
     let addr = "0.0.0.0:3000".parse::<SocketAddr>().unwrap();
-    let i = 0;
     let host_resolver = Arc::new(Mutex::new(HostResolver::new()));
 
-//    let mut channel_vector : Vec<duplex::DuplexStream> = Vec::new();
     let mut threads = Vec::new();
 
     let n_threads = num_cpus::get();
     for i in 0..n_threads {
-
-//        let (left, right) = duplex::duplex();
-
-//        channel_vector.push (left);
-
-//        let router_ref = router.clone();
         let host_resolver_ref = host_resolver.clone();
-
         threads.push(thread::spawn(move || {
             let server = Server::new(&addr, host_resolver_ref.clone());
             server.start();
@@ -60,10 +50,6 @@ fn start_server() {
     }
 
     info!("Listening on http://{} with {} threads...", addr, n_threads);
-
-//    threads.push(thread::spawn(move || {
-//        server_manager::server_manager(channel_vector);
-//    }));
 
     for t in threads {
         t.join().unwrap();
