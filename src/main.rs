@@ -19,10 +19,12 @@ use std::sync::Mutex;
 mod router;
 mod server;
 mod server_manager;
+mod file_utils;
 
 use server_manager::HostResolver;
 use server::Server;
 use router::Router;
+use file_utils::FileReader;
 use std::io::{self, Write};
 
 fn main() {
@@ -35,7 +37,17 @@ fn main() {
 
 fn start_server() {
 
-    let addr = "0.0.0.0:3000".parse::<SocketAddr>().unwrap();
+    let properties = FileReader::read().unwrap();
+    let mut addr_value = String::new();
+    for i in 0..properties.len(){
+        let (property,value) = properties[i].clone();
+        if "server="==property {
+            addr_value=value;
+            break;
+        }
+    }
+
+    let addr = addr_value.parse::<SocketAddr>().unwrap();
     let host_resolver = Arc::new(Mutex::new(HostResolver::new()));
 
     let mut threads = Vec::new();
