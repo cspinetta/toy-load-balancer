@@ -41,20 +41,21 @@ impl Service for Proxy {
 
     fn call(&self, req: Self::Request) -> Self::Future {
         info!("Dispatching request: {:?}", &req);
-        Router::new(self.host_resolver.clone()).dispatch_request(&self.client, req)
+        Router::new(self.host_resolver.clone(), false).dispatch_request(&self.client, req)
     }
 }
 
 #[derive(Clone)]
 pub struct Router {
     max_retry: Arc<u32>,
-    host_resolver: Arc<HostResolver>
+    host_resolver: Arc<HostResolver>,
+    used_cache: bool
 }
 
 impl Router {
 
-    pub fn new(host_resolver: Arc<HostResolver>) -> Router {
-        Router { max_retry: Arc::new(3), host_resolver: host_resolver }
+    pub fn new(host_resolver: Arc<HostResolver>, used_cache: bool) -> Router {
+        Router { max_retry: Arc::new(3), host_resolver: host_resolver, used_cache: used_cache }
     }
 
     fn clone_req(req: &Request) -> Request {
@@ -89,7 +90,7 @@ impl Router {
     }
 
     fn dispatch_request(self, client: &Client<HttpConnector, Body>, req: Request<Body>) -> Box<Future<Error=hyper::Error, Item=Response>> {
-        if Self::req_is_cacheable(&req) {
+        if self.used_cache && Self::req_is_cacheable(&req) {
             self.with_cache(client, req)
         } else {
             self.forward_to_server(client, req, 1)
