@@ -153,18 +153,10 @@ impl Router {
         let resp = client.request(Self::clone_req(&cloned_req)).then(move |result| {
             debug!("Max retry: {}. Current attemp: {}", ref_max.clone(), n_retry);
             match result {
-                Ok(client_resp) => {
-                    if client_resp.status() == hyper::StatusCode::Ok {
-                        Box::new(FutureOk(client_resp))
-                    } else if (n_retry < *ref_max.clone()) && (*cloned_req.method() == Get) {
-                        self.forward_to_server(&client_clone, Self::clone_req(&cloned_req), n_retry + 1)
-                    } else {
-                        Box::new(FutureOk(Response::new().with_status(StatusCode::ServiceUnavailable)))
-                    }
-                },
+                Ok(client_resp) => Box::new(FutureOk(client_resp)),
                 Err(e) => {
                     error!("Connection error: {:?}", &e);
-                    if n_retry < *ref_max.clone() {
+                    if (n_retry < *ref_max.clone()) && (*cloned_req.method() == Get) {
                         self.forward_to_server(&client_clone, Self::clone_req(&cloned_req), n_retry + 1)
                     } else {
                         Box::new(FutureOk(Response::new().with_status(StatusCode::ServiceUnavailable)))

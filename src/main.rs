@@ -64,14 +64,13 @@ fn start_server() {
     let host_resolver = Arc::new(HostResolver::new(availables_servers));
 
     let mut threads = Vec::new();
-    let redis_conn_ref = Arc::new(redis_conn);
 
     let n_threads = num_cpus::get();
     for i in 0..n_threads {
-        let redis_conn_ref2 = redis_conn_ref.clone();
+        let redis_conn_ref = Arc::new(redis_conn.clone());
         let host_resolver_ref = host_resolver.clone();
         threads.push(thread::spawn(move || {
-            let server = Server::new(&addr, host_resolver_ref.clone(), caching, redis_conn_ref2.clone());
+            let server = Server::new(&addr, host_resolver_ref.clone(), caching, redis_conn_ref.clone());
             server.start();
         }));
     }
