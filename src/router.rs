@@ -38,7 +38,7 @@ impl Service for Proxy {
 
     fn call(&self, req: Self::Request) -> Self::Future {
         info!("Dispatching request: {:?}", &req);
-        Router::new(self.host_resolver.clone()).with_cache(&self.client, req)
+        Router::new(self.host_resolver.clone()).dispatch_request(&self.client, req)
     }
 }
 
@@ -77,6 +77,18 @@ impl Router {
         Self::clone_req_custom_uri(&req, &uri)
     }
 
+    fn req_is_cacheable(req: & Request<Body>) -> bool {
+        (*req.method() == Get) // TODO check header Cache: False
+    }
+
+    fn dispatch_request(self, client: &Client<HttpConnector, Body>, req: Request<Body>) -> Box<Future<Error=hyper::Error, Item=Response>> {
+        if Self::req_is_cacheable(&req) {
+            self.with_cache(client, req)
+        } else {
+            self.forward_to_server(client, req, 1)
+        }
+    }
+
     fn with_cache(self, client: &Client<HttpConnector, Body>, req: Request<Body>) -> Box<Future<Error=hyper::Error, Item=Response>> {
     	let cache_response: redis::RedisResult<String> = redis_service::get(redis_service::create_connection(),req.uri().path().clone().to_string());
         let resp = match cache_response {
@@ -86,13 +98,13 @@ impl Router {
                 Box::new(FutureOk(Response::new().with_body(response)))
             },
             Err(e) => {
-                self.dispatch_request(client, req, 1)
+                self.forward_to_server(client, req, 1)
             }
         };
         Box::new(resp)
     }
 
-    fn dispatch_request(self, client: &Client<HttpConnector, Body>, req: Request<Body>, n_retry: u32) -> Box<Future<Error=hyper::Error, Item=Response>>
+    fn forward_to_server(self, client: &Client<HttpConnector, Body>, req: Request<Body>, n_retry: u32) -> Box<Future<Error=hyper::Error, Item=Response>>
     {
 
         let client_clone = client.clone();
@@ -109,7 +121,7 @@ impl Router {
                     if client_resp.status() == hyper::StatusCode::Ok {
                         Box::new(FutureOk(client_resp))
                     } else if (n_retry < *ref_max.clone()) && (*cloned_req.method() == Get) {
-                        self.dispatch_request(&client_clone, Self::clone_req(&cloned_req), n_retry + 1)
+                        self.forward_to_server(&client_clone, Self::clone_req(&cloned_req), n_retry + 1)
                     } else {
                         Box::new(FutureOk(Response::new().with_status(StatusCode::ServiceUnavailable)))
                     }
@@ -117,7 +129,7 @@ impl Router {
                 Err(e) => {
                     error!("Connection error: {:?}", &e);
                     if n_retry < *ref_max.clone() {
-                        self.dispatch_request(&client_clone, Self::clone_req(&cloned_req), n_retry + 1)
+                        self.forward_to_server(&client_clone, Self::clone_req(&cloned_req), n_retry + 1)
                     } else {
                         Box::new(FutureOk(Response::new().with_status(StatusCode::ServiceUnavailable)))
                     }
