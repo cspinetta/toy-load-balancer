@@ -20,6 +20,7 @@ mod router;
 mod server;
 mod host_resolver;
 mod file_utils;
+mod redis_service;
 
 use host_resolver::HostResolver;
 use server::Server;

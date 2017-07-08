@@ -14,6 +14,8 @@ use std::sync::Arc;
 
 use host_resolver::HostResolver;
 
+use redis_service;
+
 #[derive(Clone)]
 pub struct Proxy {
     pub client: Client<HttpConnector, Body>,
@@ -76,6 +78,15 @@ impl Router {
 
     fn dispatch_request(self, client: &Client<HttpConnector, Body>, req: Request<Body>, n_retry: u32) -> Box<Future<Error=hyper::Error, Item=Response>>
     {
+    	let cache_response = redis_service::get(redis_service::create_connection(),req.uri().path().clone().to_string());
+        match cache_response {
+        	//TODO FALTA EL RETURN
+            Ok(response) =>  Box::new(FutureOk(response)),
+            Err(e) => {
+                error!("{:?}", &e);
+            }
+        };
+		
         let client_clone = client.clone();
         let ref_max = self.max_retry.clone();
 
@@ -106,6 +117,12 @@ impl Router {
                 }
             }
         });
+        redis_service::set(redis_service::create_connection(),req.uri().path().clone().to_string(),
+        	resp.map(|body| {
+                        Response::new()
+                            .with_body(body)
+                    })
+        );
         Box::new(resp)
     }
 }
