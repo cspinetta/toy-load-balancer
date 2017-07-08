@@ -12,11 +12,10 @@ cargo run
 
 ## Benchmarks
 A continuación presentamos un benchmark para comparar resultados entre nuestro load balancer y varios load balancer comerciales. Los load balancers que elegimos son HAProxy y nginx, y para realizar las pruebas utilizamos la herramienta Apache Benchmark. Para las pruebas utilizamos un server que responde a pedidos GET con respuestas de tamaño dinámico en base a un parámetro del request, la idea es tener varias instancias de este server y poder balancearlo. El código de estos servers se encuentra en server-example.js dentro del directorio examples.
+
 Configuraciones del sistema:
-```uname -srmpio
+```
 Linux 4.4.0-83-generic x86_64 x86_64 x86_64 GNU/Linux
-```
-```
 Architecture:          x86_64
 CPU op-mode(s):        32-bit, 64-bit
 Byte Order:            Little Endian
@@ -310,21 +309,51 @@ Percentage of the requests served within a certain time (ms)
 ### Tercer escenario
 - Cantidad de servidores a balancear: 8
 - Tipo de pedidos: GET con respuestas del servidor de 10K
-- Request totales: 5000
+- Request totales: 900
 - Request concurrentes: 20
 
 **Toy Load Balancer**
 
-ab -n 5000 -c 20 -g toy-load-balancer-eight.tsv http://127.0.0.1:3000/10240
+ab -n 900 -c 20 -g toy-load-balancer-eight.tsv http://127.0.0.1:3000/10240
 
 Resultados:
 ```
+Document Path:          /10240
+Document Length:        10279 bytes
 
+Concurrency Level:      20
+Time taken for tests:   1.426 seconds
+Complete requests:      900
+Failed requests:        0
+Total transferred:      9371700 bytes
+HTML transferred:       9251100 bytes
+Requests per second:    631.20 [#/sec] (mean)
+Time per request:       31.686 [ms] (mean)
+Time per request:       1.584 [ms] (mean, across all concurrent requests)
+Transfer rate:          6418.59 [Kbytes/sec] received
+
+Connection Times (ms)
+              min  mean[+/-sd] median   max
+Connect:        0    0   0.1      0       1
+Processing:     7   31  14.5     31     117
+Waiting:        7   31  14.5     31     117
+Total:          7   31  14.6     31     118
+
+Percentage of the requests served within a certain time (ms)
+  50%     31
+  66%     35
+  75%     38
+  80%     41
+  90%     44
+  95%     49
+  98%     79
+  99%    103
+ 100%    118 (longest request)
 ```
 
 **HAProxy**
 
-ab -n 5000 -c 20 -g ha-load-balancer-eight.tsv http://127.0.0.1:80/10240
+ab -n 900 -c 20 -g ha-load-balancer-eight.tsv http://127.0.0.1:80/10240
 
 Resultados:
 ```
