@@ -1,5 +1,6 @@
 extern crate hyper;
 extern crate futures;
+extern crate redis;
 
 use futures::Future;
 use futures::future::ok as FutureOk;
@@ -37,7 +38,7 @@ impl Service for Proxy {
 
     fn call(&self, req: Self::Request) -> Self::Future {
         info!("Dispatching request: {:?}", &req);
-        Router::new(self.host_resolver.clone()).dispatch_request(&self.client, req, 1)
+        Router::new(self.host_resolver.clone()).with_cache(&self.client, req)
     }
 }
 
@@ -76,17 +77,24 @@ impl Router {
         Self::clone_req_custom_uri(&req, &uri)
     }
 
-    fn dispatch_request(self, client: &Client<HttpConnector, Body>, req: Request<Body>, n_retry: u32) -> Box<Future<Error=hyper::Error, Item=Response>>
-    {
-    	let cache_response = redis_service::get(redis_service::create_connection(),req.uri().path().clone().to_string());
-        match cache_response {
+    fn with_cache(self, client: &Client<HttpConnector, Body>, req: Request<Body>) -> Box<Future<Error=hyper::Error, Item=Response>> {
+    	let cache_response: redis::RedisResult<String> = redis_service::get(redis_service::create_connection(),req.uri().path().clone().to_string());
+        let resp = match cache_response {
         	//TODO FALTA EL RETURN
-            Ok(response) =>  Box::new(FutureOk(response)),
+            Ok(response) =>  {
+                info!("Response from Redis: {:?}", response);
+                Box::new(FutureOk(Response::new().with_body(response)))
+            },
             Err(e) => {
-                error!("{:?}", &e);
+                self.dispatch_request(client, req, 1)
             }
         };
-		
+        Box::new(resp)
+    }
+
+    fn dispatch_request(self, client: &Client<HttpConnector, Body>, req: Request<Body>, n_retry: u32) -> Box<Future<Error=hyper::Error, Item=Response>>
+    {
+
         let client_clone = client.clone();
         let ref_max = self.max_retry.clone();
 
@@ -117,12 +125,12 @@ impl Router {
                 }
             }
         });
-        redis_service::set(redis_service::create_connection(),req.uri().path().clone().to_string(),
-        	resp.map(|body| {
-                        Response::new()
-                            .with_body(body)
-                    })
-        );
+//        redis_service::set(redis_service::create_connection(),req.uri().path().clone().to_string(),
+//        	resp.map(|body| {
+//                        Response::new()
+//                            .with_body(body)
+//                    })
+//        );
         Box::new(resp)
     }
 }
