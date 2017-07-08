@@ -19,6 +19,7 @@ use std::sync::Arc;
 use host_resolver::HostResolver;
 
 use redis_service;
+use file_utils::FileReader;
 
 #[derive(Clone)]
 pub struct Proxy {
@@ -40,8 +41,16 @@ impl Service for Proxy {
     type Future = Box<Future<Item=Self::Response, Error = Self::Error>>;
 
     fn call(&self, req: Self::Request) -> Self::Future {
+		let mut caching = String::new();
+		let properties = FileReader::read().unwrap();
+        for i in 0..properties.len(){
+	        let (property,value) = properties[i].clone();
+	        if "caching=" == property {
+	            caching = value.clone();
+	        } 
+	    }
         info!("Dispatching request: {:?}", &req);
-        Router::new(self.host_resolver.clone(), true).dispatch_request(&self.client, req)
+        Router::new(self.host_resolver.clone(), caching=="true").dispatch_request(&self.client, req)
     }
 }
 
