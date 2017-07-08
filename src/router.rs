@@ -41,7 +41,7 @@ impl Service for Proxy {
 
     fn call(&self, req: Self::Request) -> Self::Future {
         info!("Dispatching request: {:?}", &req);
-        Router::new(self.host_resolver.clone(), false).dispatch_request(&self.client, req)
+        Router::new(self.host_resolver.clone(), true).dispatch_request(&self.client, req)
     }
 }
 
@@ -74,19 +74,23 @@ impl Router {
         format!("{}{}{}", host, uri.path(), uri.query().unwrap_or("")).parse()
     }
 
-    fn map_req(&self, req: Request) -> Request {
-        let host = self.host_resolver.clone().get_next();
-        let uri = Self::create_url(host.as_ref(), req.uri().clone())
-            .expect(&format!("Failed trying to parse uri. Origin: {:?}", &req.uri()));
-        Self::clone_req_custom_uri(&req, &uri)
-    }
-
     fn req_is_cacheable(req: & Request<Body>) -> bool {
         (*req.method() == Get) // TODO check header Cache: False
     }
 
     fn cache_key(req: &Request<Body>) -> String {
         req.uri().path().clone().to_string()
+    }
+
+    fn try_cache(redis_conn: Arc<redis::Connection>, key: String, body: String) {
+        redis_service::set(redis_conn, key, body);
+    }
+
+    fn map_req(&self, req: Request) -> Request {
+        let host = self.host_resolver.clone().get_next();
+        let uri = Self::create_url(host.as_ref(), req.uri().clone())
+            .expect(&format!("Failed trying to parse uri. Origin: {:?}", &req.uri()));
+        Self::clone_req_custom_uri(&req, &uri)
     }
 
     fn dispatch_request(self, client: &Client<HttpConnector, Body>, req: Request<Body>) -> Box<Future<Error=hyper::Error, Item=Response>> {
@@ -100,7 +104,7 @@ impl Router {
     fn with_cache(self, client: &Client<HttpConnector, Body>, req: Request<Body>) -> Box<Future<Error=hyper::Error, Item=Response>> {
         let redis_conn = Arc::new(redis_service::create_connection());
         let cache_key = Self::cache_key(&req);
-        let cache_response = redis_service::get(redis_conn.clone(), cache_key);
+        let cache_response = redis_service::get(redis_conn.clone(), cache_key.clone());
         let resp: Box<Future<Error=hyper::Error, Item=Response>> = match cache_response {
         	//TODO FALTA EL RETURN
             Ok(response) =>  {
@@ -119,7 +123,7 @@ impl Router {
                             })
                             .map(move |body| {
                                 let body_str = String::from_utf8(body).unwrap();
-                                Router::try_cache(redis_conn.clone(), body_str.clone());
+                                Router::try_cache(redis_conn.clone(), cache_key.clone(), body_str.clone());
                                 let resp: Response<Body> = Response::new()
                                     .with_header(ContentLength(body_str.len() as u64))
                                     .with_body(body_str.clone());
@@ -131,10 +135,6 @@ impl Router {
             }
         };
         resp
-    }
-
-    fn try_cache(redis_conn: Arc<redis::Connection>, key: String) {
-        redis_service::set(redis_conn, key, String::from(""));
     }
 
     fn forward_to_server(self, client: &Client<HttpConnector, Body>, req: Request<Body>, n_retry: u32) -> Box<Future<Error=hyper::Error, Item=Response>>
@@ -170,12 +170,6 @@ impl Router {
                 }
             }
         });
-//        redis_service::set(redis_service::create_connection(),req.uri().path().clone().to_string(),
-//        	resp.map(|body| {
-//                        Response::new()
-//                            .with_body(body)
-//                    })
-//        );
         Box::new(resp)
     }
 }
