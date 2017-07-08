@@ -1,5 +1,2 @@
 server=0.0.0.0:3000
-host1=http://192.0.0.1
-host2=http://192.0.0.2
-host3=http://192.0.0.3
-host4=http://192.0.0.4
+host1=http://127.0.0.1:3001

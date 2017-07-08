@@ -18,12 +18,12 @@ use server_manager::HostResolver;
 #[derive(Clone)]
 pub struct Proxy {
     pub client: Client<HttpConnector, Body>,
-    pub host_resolver: Arc<Mutex<HostResolver>>,
+    pub host_resolver: Arc<HostResolver>,
 }
 
 impl Proxy {
 
-    pub fn new(client: Client<HttpConnector, Body>, host_resolver: Arc<Mutex<HostResolver>>) -> Proxy {
+    pub fn new(client: Client<HttpConnector, Body>, host_resolver: Arc<HostResolver>) -> Proxy {
         Proxy { client, host_resolver }
     }
 }
@@ -43,12 +43,12 @@ impl Service for Proxy {
 #[derive(Clone)]
 pub struct Router {
     max_retry: Arc<u32>,
-    host_resolver: Arc<Mutex<HostResolver>>
+    host_resolver: Arc<HostResolver>
 }
 
 impl Router {
 
-    pub fn new(host_resolver: Arc<Mutex<HostResolver>>) -> Router {
+    pub fn new(host_resolver: Arc<HostResolver>) -> Router {
         Router { max_retry: Arc::new(3), host_resolver: host_resolver }
     }
 
@@ -69,8 +69,8 @@ impl Router {
     }
 
     fn map_req(&self, req: Request) -> Request {
-        let host = self.host_resolver.lock().unwrap().get_next();
-        let uri = Self::create_url(host, req.uri().clone())
+        let host = self.host_resolver.clone().get_next();
+        let uri = Self::create_url(host.as_ref(), req.uri().clone())
             .expect(&format!("Failed trying to parse uri. Origin: {:?}", &req.uri()));
         Self::clone_req_custom_uri(&req, &uri)
     }

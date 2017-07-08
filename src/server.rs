@@ -20,12 +20,12 @@ use server_manager::HostResolver;
 
 pub struct Server<'a> {
     addr: &'a SocketAddr,
-    host_resolver:  Arc<Mutex<HostResolver>>,
+    host_resolver:  Arc<HostResolver>,
 }
 
 impl<'a> Server<'a> {
 
-    pub fn new(addr: &'a SocketAddr, host_resolver:  Arc<Mutex<HostResolver>>) -> Server<'a> {
+    pub fn new(addr: &'a SocketAddr, host_resolver:  Arc<HostResolver>) -> Server<'a> {
         Server { addr: addr, host_resolver: host_resolver }
     }
 

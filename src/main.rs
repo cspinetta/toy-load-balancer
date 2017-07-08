@@ -38,17 +38,23 @@ fn main() {
 fn start_server() {
 
     let properties = FileReader::read().unwrap();
+    let mut availables_servers: Vec<String> = Vec::new();
+
     let mut addr_value = String::new();
+
     for i in 0..properties.len(){
         let (property,value) = properties[i].clone();
-        if "server="==property {
-            addr_value=value;
-            break;
+        if "server=" == property {
+            addr_value = value;
+//            break;
+        } else {
+            let s = value.clone();
+            availables_servers.push(s);
         }
     }
 
     let addr = addr_value.parse::<SocketAddr>().unwrap();
-    let host_resolver = Arc::new(Mutex::new(HostResolver::new()));
+    let host_resolver = Arc::new(HostResolver::new(availables_servers));
 
     let mut threads = Vec::new();
 
