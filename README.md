@@ -11,7 +11,39 @@ cargo run
 ```
 
 ## Benchmarks
-A continuación presentamos un benchmark para comparar resultados entre nuestro load balancer y varios load balancer comerciales. Los load balancers que elegimos son HAProxy y nginx, y para realizar las pruebas utilizamos la herramienta Apache Benchmark. Para las pruebas utilizamos un server que responde a pedidos GET con respuestas de tamaño dinámico en base a un parámetro del request, la idea es tener varias instancias de este server y poder balancearlo. El código de estos servers se encuentra en server-example.js dentro del directorio examples. A continuación planteamos tres escenarios distintos:
+A continuación presentamos un benchmark para comparar resultados entre nuestro load balancer y varios load balancer comerciales. Los load balancers que elegimos son HAProxy y nginx, y para realizar las pruebas utilizamos la herramienta Apache Benchmark. Para las pruebas utilizamos un server que responde a pedidos GET con respuestas de tamaño dinámico en base a un parámetro del request, la idea es tener varias instancias de este server y poder balancearlo. El código de estos servers se encuentra en server-example.js dentro del directorio examples.
+Configuraciones del sistema:
+```uname -srmpio
+Linux 4.4.0-83-generic x86_64 x86_64 x86_64 GNU/Linux
+```
+```
+Architecture:          x86_64
+CPU op-mode(s):        32-bit, 64-bit
+Byte Order:            Little Endian
+CPU(s):                4
+On-line CPU(s) list:   0-3
+Thread(s) per core:    2
+Core(s) per socket:    2
+Socket(s):             1
+NUMA node(s):          1
+Vendor ID:             GenuineIntel
+CPU family:            6
+Model:                 58
+Model name:            Intel(R) Core(TM) i5-3317U CPU @ 1.70GHz
+Stepping:              9
+CPU MHz:               1492.679
+CPU max MHz:           2600,0000
+CPU min MHz:           800,0000
+BogoMIPS:              3391.96
+Virtualization:        VT-x
+L1d cache:             32K
+L1i cache:             32K
+L2 cache:              256K
+L3 cache:              3072K
+NUMA node0 CPU(s):     0-3
+```
+
+A continuación planteamos tres escenarios distintos:
 
 ### Primer escenario
 - Cantidad de servidores a balancear: 4
