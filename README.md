@@ -51,8 +51,9 @@ A continuación planteamos tres escenarios distintos:
 - Request concurrentes: 10
 
 **Toy Load Balancer**
-
+```
 ab -n 500 -c 10 -g toy-load-balancer-1K.tsv http://127.0.0.1:3000/1024
+```
 
 Resultados:
 ```
@@ -90,8 +91,9 @@ Percentage of the requests served within a certain time (ms)
 ```
 
 **HAProxy**
-
+```
 ab -n 500 -c 10 -g haproxy-load-balancer-1K.tsv http://127.0.0.1:80/1024
+```
 
 Resultados:
 ```
@@ -129,8 +131,9 @@ Percentage of the requests served within a certain time (ms)
 ```
 
 **Nginx**
-
+```
 ab -n 500 -c 10 -g nginx-load-balancer-1K.tsv http://127.0.0.1:81/1024
+```
 
 Resultados:
 ```
@@ -181,8 +184,9 @@ Percentage of the requests served within a certain time (ms)
 - Request concurrentes: 10
 
 **Toy Load Balancer**
-
+```
 ab -n 500 -c 10 -g toy-load-balancer-300K.tsv http://127.0.0.1:3000/307200
+```
 
 Resultados:
 ```
@@ -221,8 +225,9 @@ Percentage of the requests served within a certain time (ms)
 ```
 
 **HAProxy**
-
+```
 ab -n 500 -c 10 -g haproxy-load-balancer-300K.tsv http://127.0.0.1:80/307200
+```
 
 Resultados:
 ```
@@ -260,8 +265,9 @@ Percentage of the requests served within a certain time (ms)
 ```
 
 **Nginx**
-
+```
 ab -n 500 -c 10 -g nginx-load-balancer-300K.tsv http://127.0.0.1:80/307200
+```
 
 Resultados:
 ```
@@ -313,8 +319,9 @@ Percentage of the requests served within a certain time (ms)
 - Request concurrentes: 20
 
 **Toy Load Balancer**
-
+```
 ab -n 900 -c 20 -g toy-load-balancer-eight.tsv http://127.0.0.1:3000/10240
+```
 
 Resultados:
 ```
@@ -352,8 +359,9 @@ Percentage of the requests served within a certain time (ms)
 ```
 
 **HAProxy**
-
+```
 ab -n 900 -c 20 -g ha-load-balancer-eight.tsv http://127.0.0.1:80/10240
+```
 
 Resultados:
 ```
@@ -391,8 +399,9 @@ Percentage of the requests served within a certain time (ms)
 ```
 
 **Nginx**
-
+```
 ab -n 5000 -c 20 -g nginx-load-balancer-eight.tsv http://127.0.0.1:81/10240
+```
 
 Resultados:
 ```
