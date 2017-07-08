@@ -141,7 +141,7 @@ Percentage of the requests served within a certain time (ms)
 
 **Toy Load Balancer vs Nginx**
 
-![alt text](https://raw.githubusercontent.com/cspinetta/toy-load-balancer/master/resources/comparison-nginx-toy-1k.png)
+![alt text](https://raw.githubusercontent.com/cspinetta/toy-load-balancer/master/comparison-nginx-toy-1k.png)
 
 ### Segundo escenario
 - Cantidad de servidores a balancear: 4
@@ -268,11 +268,11 @@ Percentage of the requests served within a certain time (ms)
  ```
 **Toy Load Balancer vs HAProxy**
 
-![alt text](https://raw.githubusercontent.com/cspinetta/toy-load-balancer/master/resources/comparison-ha-toy-300K.png)
+![alt text](https://raw.githubusercontent.com/cspinetta/toy-load-balancer/master/comparison-ha-toy-300K.png)
 
 **Toy Load Balancer vs Nginx**
 
-![alt text](https://raw.githubusercontent.com/cspinetta/toy-load-balancer/master/resources/comparison-nginx-toy-300K.png)
+![alt text](https://raw.githubusercontent.com/cspinetta/toy-load-balancer/master/comparison-nginx-toy-300K.png)
 
 
 ### Tercer escenario
