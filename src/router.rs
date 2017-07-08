@@ -81,6 +81,10 @@ impl Router {
         (*req.method() == Get) // TODO check header Cache: False
     }
 
+    fn cache_key(req: &Request<Body>) -> String {
+        req.uri().path().clone().to_string()
+    }
+
     fn dispatch_request(self, client: &Client<HttpConnector, Body>, req: Request<Body>) -> Box<Future<Error=hyper::Error, Item=Response>> {
         if Self::req_is_cacheable(&req) {
             self.with_cache(client, req)
@@ -90,18 +94,31 @@ impl Router {
     }
 
     fn with_cache(self, client: &Client<HttpConnector, Body>, req: Request<Body>) -> Box<Future<Error=hyper::Error, Item=Response>> {
-    	let cache_response: redis::RedisResult<String> = redis_service::get(redis_service::create_connection(),req.uri().path().clone().to_string());
-        let resp = match cache_response {
+        let redis_conn = Arc::new(redis_service::create_connection());
+        let cache_key = Self::cache_key(&req);
+        let cache_response = redis_service::get(redis_conn.clone(), cache_key);
+        let resp: Box<Future<Error=hyper::Error, Item=Response>> = match cache_response {
         	//TODO FALTA EL RETURN
             Ok(response) =>  {
                 info!("Response from Redis: {:?}", response);
                 Box::new(FutureOk(Response::new().with_body(response)))
             },
             Err(e) => {
-                self.forward_to_server(client, req, 1)
+                let resp = self
+                    .forward_to_server(client, req, 1)
+                    .and_then(move |response| {
+                        Router::try_cache(redis_conn.clone(), String::from(""));
+                        FutureOk(response)
+                    });
+                Box::new(resp)
             }
         };
-        Box::new(resp)
+//        Box::new(resp)
+        resp
+    }
+
+    fn try_cache(redis_conn: Arc<redis::Connection>, key: String) {
+        redis_service::set(redis_conn, key, String::from(""));
     }
 
     fn forward_to_server(self, client: &Client<HttpConnector, Body>, req: Request<Body>, n_retry: u32) -> Box<Future<Error=hyper::Error, Item=Response>>
