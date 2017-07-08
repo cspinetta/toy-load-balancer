@@ -137,11 +137,11 @@ Percentage of the requests served within a certain time (ms)
  ```
 **Toy Load Balancer vs HAProxy**
 
-![alt text](https://raw.githubusercontent.com/cspinetta/toy-load-balancer/master/comparison-ha-toy-1K.png)
+![alt text](https://raw.githubusercontent.com/cspinetta/toy-load-balancer/master/benches/comparison-ha-toy-1K.png)
 
 **Toy Load Balancer vs Nginx**
 
-![alt text](https://raw.githubusercontent.com/cspinetta/toy-load-balancer/master/comparison-nginx-toy-1k.png)
+![alt text](https://raw.githubusercontent.com/cspinetta/toy-load-balancer/master/benches/comparison-nginx-toy-1k.png)
 
 ### Segundo escenario
 - Cantidad de servidores a balancear: 4
@@ -268,11 +268,11 @@ Percentage of the requests served within a certain time (ms)
  ```
 **Toy Load Balancer vs HAProxy**
 
-![alt text](https://raw.githubusercontent.com/cspinetta/toy-load-balancer/master/comparison-ha-toy-300K.png)
+![alt text](https://raw.githubusercontent.com/cspinetta/toy-load-balancer/master/benches/comparison-ha-toy-300K.png)
 
 **Toy Load Balancer vs Nginx**
 
-![alt text](https://raw.githubusercontent.com/cspinetta/toy-load-balancer/master/comparison-nginx-toy-300K.png)
+![alt text](https://raw.githubusercontent.com/cspinetta/toy-load-balancer/master/benches/comparison-nginx-toy-300K.png)
 
 
 ### Tercer escenario
@@ -369,11 +369,14 @@ Percentage of the requests served within a certain time (ms)
  ```
 **Toy Load Balancer vs HAProxy**
 
-![alt text](https://raw.githubusercontent.com/cspinetta/toy-load-balancer/master/resources/comparison-ha-toy-eight.png)
+![alt text](https://raw.githubusercontent.com/cspinetta/toy-load-balancer/master/benches/comparison-ha-toy-eight.png)
 
 **Toy Load Balancer vs Nginx**
 
-![alt text](https://raw.githubusercontent.com/cspinetta/toy-load-balancer/master/resources/comparison-nginx-toy-eight.png)
+![alt text](https://raw.githubusercontent.com/cspinetta/toy-load-balancer/master/benches/comparison-nginx-toy-eight.png)
+
+### Conclusiones
+A pesar de que los tiempos para request con respuestas más pequeñas no son tan similares a otros load balancers, si se puede notar que para request GET con respuestas más extensas nuestro load balancer se asemeja bastante a otros load balancers del mercado.
 
 ## Design decisions and selected technology
 Sigamos en español para facilitar la evaluación =)
