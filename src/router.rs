@@ -11,13 +11,11 @@ use hyper::server::{Request, Response, Service};
 use hyper::client::HttpConnector;
 use hyper::error::UriError;
 use hyper::Get;
-
 use hyper::header::ContentLength;
-
 use std::sync::Arc;
 
 use host_resolver::HostResolver;
-
+use redis_service::Cache;
 use redis_service;
 use file_utils::FileReader;
 
@@ -25,12 +23,13 @@ use file_utils::FileReader;
 pub struct Proxy {
     pub client: Client<HttpConnector, Body>,
     pub host_resolver: Arc<HostResolver>,
+    pub cache: Arc<Cache>,
 }
 
 impl Proxy {
 
-    pub fn new(client: Client<HttpConnector, Body>, host_resolver: Arc<HostResolver>) -> Proxy {
-        Proxy { client, host_resolver }
+    pub fn new(client: Client<HttpConnector, Body>, host_resolver: Arc<HostResolver>, cache: Arc<Cache>) -> Proxy {
+        Proxy { client, host_resolver, cache }
     }
 }
 
@@ -50,7 +49,8 @@ impl Service for Proxy {
 	        } 
 	    }
         info!("Dispatching request: {:?}", &req);
-        Router::new(self.host_resolver.clone(), caching=="true").dispatch_request(&self.client, req)
+        Router::new(self.host_resolver.clone(), self.cache.clone(), caching=="true")
+            .dispatch_request(&self.client, req)
     }
 }
 
@@ -58,13 +58,14 @@ impl Service for Proxy {
 pub struct Router {
     max_retry: Arc<u32>,
     host_resolver: Arc<HostResolver>,
+    cache: Arc<Cache>,
     used_cache: bool
 }
 
 impl Router {
 
-    pub fn new(host_resolver: Arc<HostResolver>, used_cache: bool) -> Router {
-        Router { max_retry: Arc::new(3), host_resolver: host_resolver, used_cache: used_cache }
+    pub fn new(host_resolver: Arc<HostResolver>, cache: Arc<Cache>, used_cache: bool) -> Router {
+        Router { max_retry: Arc::new(3), host_resolver: host_resolver, cache: cache, used_cache: used_cache }
     }
 
     fn clone_req(req: &Request) -> Request {
@@ -91,10 +92,6 @@ impl Router {
         req.uri().path().clone().to_string()
     }
 
-    fn try_cache(redis_conn: Arc<redis::Connection>, key: String, body: String) {
-        redis_service::set(redis_conn, key, body);
-    }
-
     fn map_req(&self, req: Request) -> Request {
         let host = self.host_resolver.clone().get_next();
         let uri = Self::create_url(host.as_ref(), req.uri().clone())
@@ -111,11 +108,10 @@ impl Router {
     }
 
     fn with_cache(self, client: &Client<HttpConnector, Body>, req: Request<Body>) -> Box<Future<Error=hyper::Error, Item=Response>> {
-        let redis_conn = Arc::new(redis_service::create_connection());
         let cache_key = Self::cache_key(&req);
-        let cache_response = redis_service::get(redis_conn.clone(), cache_key.clone());
+        let cache_ref = self.cache.clone();
+        let cache_response = cache_ref.clone().get(cache_key.clone());
         let resp: Box<Future<Error=hyper::Error, Item=Response>> = match cache_response {
-        	//TODO FALTA EL RETURN
             Ok(response) =>  {
                 info!("Response from Redis: {:?}", response);
                 Box::new(FutureOk(Response::new().with_body(response)))
@@ -131,8 +127,8 @@ impl Router {
                                 futures::future::ok::<_, hyper::Error>(acc)
                             })
                             .map(move |body| {
+                                cache_ref.clone().set(cache_key.clone(), String::from_utf8(body.clone()).unwrap());
                                 let body_str = String::from_utf8(body).unwrap();
-                                Router::try_cache(redis_conn.clone(), cache_key.clone(), body_str.clone());
                                 let resp: Response<Body> = Response::new()
                                     .with_header(ContentLength(body_str.len() as u64))
                                     .with_body(body_str.clone());

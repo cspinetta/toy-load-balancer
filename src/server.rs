@@ -17,6 +17,8 @@ use std::net::SocketAddr;
 use router::Proxy;
 use host_resolver::HostResolver;
 
+use redis_service::Cache;
+
 
 pub struct Server<'a> {
     addr: &'a SocketAddr,
@@ -38,9 +40,10 @@ impl<'a> Server<'a> {
             .listen(128).unwrap();
 
         let listener = TcpListener::from_listener(listener, self.addr, &handle).unwrap();
+        let cache = Arc::new(Cache::new());
 
         let all_conns = listener.incoming().for_each(|(socket, addr)| {
-            let service = Proxy::new(Client::new(&handle), self.host_resolver.clone());
+            let service = Proxy::new(Client::new(&handle), self.host_resolver.clone(), cache.clone());
             Http::new().bind_connection(&handle, socket, addr, service.clone());
             Ok(())
         }).map_err(|err| {
