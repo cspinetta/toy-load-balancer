@@ -3,6 +3,7 @@ extern crate futures;
 extern crate redis;
 
 use futures::Future;
+use futures::Stream;
 use futures::future::ok as FutureOk;
 
 use hyper::{Client, Body, Uri, StatusCode};
@@ -10,6 +11,8 @@ use hyper::server::{Request, Response, Service};
 use hyper::client::HttpConnector;
 use hyper::error::UriError;
 use hyper::Get;
+
+use hyper::header::ContentLength;
 
 use std::sync::Arc;
 
@@ -107,13 +110,25 @@ impl Router {
                 let resp = self
                     .forward_to_server(client, req, 1)
                     .and_then(move |response| {
-                        Router::try_cache(redis_conn.clone(), String::from(""));
-                        FutureOk(response)
+                        let resp = response
+                            .body()
+                            .fold(Vec::new(), |mut acc, chunk| {
+                                acc.extend_from_slice(&*chunk);
+                                futures::future::ok::<_, hyper::Error>(acc)
+                            })
+                            .map(move |body| {
+                                let body_str = String::from_utf8(body).unwrap();
+                                Router::try_cache(redis_conn.clone(), body_str.clone());
+                                let resp: Response<Body> = Response::new()
+                                    .with_header(ContentLength(body_str.len() as u64))
+                                    .with_body(body_str.clone());
+                                resp
+                            });
+                        Box::new(resp)
                     });
                 Box::new(resp)
             }
         };
-//        Box::new(resp)
         resp
     }
 
