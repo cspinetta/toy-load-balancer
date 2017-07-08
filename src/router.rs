@@ -16,7 +16,6 @@ use std::sync::Arc;
 
 use host_resolver::HostResolver;
 use redis_service::Cache;
-use redis_service;
 use file_utils::FileReader;
 
 #[derive(Clone)]
@@ -49,7 +48,7 @@ impl Service for Proxy {
 	        } 
 	    }
         info!("Dispatching request: {:?}", &req);
-        Router::new(self.host_resolver.clone(), self.cache.clone(), caching=="true")
+        Router::new(self.host_resolver.clone(), self.cache.clone())
             .dispatch_request(&self.client, req)
     }
 }
@@ -58,14 +57,13 @@ impl Service for Proxy {
 pub struct Router {
     max_retry: Arc<u32>,
     host_resolver: Arc<HostResolver>,
-    cache: Arc<Cache>,
-    used_cache: bool
+    cache: Arc<Cache>
 }
 
 impl Router {
 
-    pub fn new(host_resolver: Arc<HostResolver>, cache: Arc<Cache>, used_cache: bool) -> Router {
-        Router { max_retry: Arc::new(3), host_resolver: host_resolver, cache: cache, used_cache: used_cache }
+    pub fn new(host_resolver: Arc<HostResolver>, cache: Arc<Cache>) -> Router {
+        Router { max_retry: Arc::new(3), host_resolver: host_resolver, cache: cache }
     }
 
     fn clone_req(req: &Request) -> Request {
@@ -100,7 +98,7 @@ impl Router {
     }
 
     fn dispatch_request(self, client: &Client<HttpConnector, Body>, req: Request<Body>) -> Box<Future<Error=hyper::Error, Item=Response>> {
-        if self.used_cache && Self::req_is_cacheable(&req) {
+        if Self::req_is_cacheable(&req) {
             self.with_cache(client, req)
         } else {
             self.forward_to_server(client, req, 1)

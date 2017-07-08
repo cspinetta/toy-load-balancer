@@ -17,18 +17,20 @@ use std::net::SocketAddr;
 use router::Proxy;
 use host_resolver::HostResolver;
 
-use redis_service::Cache;
+use redis_service::{Cache, ImplCache, NoOpCache};
 
 
 pub struct Server<'a> {
     addr: &'a SocketAddr,
     host_resolver:  Arc<HostResolver>,
+    caching: bool,
+    redis_conn: Arc<String>,
 }
 
 impl<'a> Server<'a> {
 
-    pub fn new(addr: &'a SocketAddr, host_resolver:  Arc<HostResolver>) -> Server<'a> {
-        Server { addr: addr, host_resolver: host_resolver }
+    pub fn new(addr: &'a SocketAddr, host_resolver:  Arc<HostResolver>, caching: bool, redis_conn: Arc<String>) -> Server<'a> {
+        Server { addr: addr, host_resolver: host_resolver, caching: caching, redis_conn: redis_conn }
     }
 
     pub fn start(self) {
@@ -40,7 +42,11 @@ impl<'a> Server<'a> {
             .listen(128).unwrap();
 
         let listener = TcpListener::from_listener(listener, self.addr, &handle).unwrap();
-        let cache = Arc::new(Cache::new());
+        let cache: Arc<Cache> = if self.caching {
+            Arc::new(ImplCache::new((*self.redis_conn).clone()))
+        } else {
+            Arc::new(NoOpCache::new())
+        };
 
         let all_conns = listener.incoming().for_each(|(socket, addr)| {
             let service = Proxy::new(Client::new(&handle), self.host_resolver.clone(), cache.clone());
