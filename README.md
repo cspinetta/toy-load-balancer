@@ -11,12 +11,11 @@ cargo run
 ```
 
 ## Benchmarks
-A continuación presentamos un benchmark para comparar resultados entre nuestro load balancer y varios load balancer comerciales. Los load balancers que elegimos son HAProxy y nginx, y para realizar las pruebas utilizamos la herramienta Apache Benchmark. Para las pruebas utilizamos un server que responde a pedidos GET con respuestas de tamaño dinámico en base a un parámetro del request, la idea es tener varias instancias de este server y poder balancearlo. El código de estos servers se encuentra en server-example.js dentro del directorio examples.
+A continuación presentamos un benchmark para comparar resultados entre nuestro load balancer y varios load balancer comerciales. Los load balancers que elegimos son HAProxy y nginx, y para realizar las pruebas utilizamos la herramienta Apache Benchmark. Para las pruebas utilizamos un server que responde a pedidos GET con respuestas de tamaño dinámico en base a un parámetro del request, la idea es tener varias instancias de este server y poder balancearlo. El código de estos servers se encuentra en server-example.js dentro del directorio examples, y además de los resultados de ab en el README se pueden ver otros en la carpeta benches.
+
 Configuraciones del sistema:
-```uname -srmpio
+```
 Linux 4.4.0-83-generic x86_64 x86_64 x86_64 GNU/Linux
-```
-```
 Architecture:          x86_64
 CPU op-mode(s):        32-bit, 64-bit
 Byte Order:            Little Endian
@@ -52,8 +51,9 @@ A continuación planteamos tres escenarios distintos:
 - Request concurrentes: 10
 
 **Toy Load Balancer**
-
+```
 ab -n 500 -c 10 -g toy-load-balancer-1K.tsv http://127.0.0.1:3000/1024
+```
 
 Resultados:
 ```
@@ -91,8 +91,9 @@ Percentage of the requests served within a certain time (ms)
 ```
 
 **HAProxy**
-
+```
 ab -n 500 -c 10 -g haproxy-load-balancer-1K.tsv http://127.0.0.1:80/1024
+```
 
 Resultados:
 ```
@@ -130,8 +131,9 @@ Percentage of the requests served within a certain time (ms)
 ```
 
 **Nginx**
-
+```
 ab -n 500 -c 10 -g nginx-load-balancer-1K.tsv http://127.0.0.1:81/1024
+```
 
 Resultados:
 ```
@@ -182,8 +184,9 @@ Percentage of the requests served within a certain time (ms)
 - Request concurrentes: 10
 
 **Toy Load Balancer**
-
+```
 ab -n 500 -c 10 -g toy-load-balancer-300K.tsv http://127.0.0.1:3000/307200
+```
 
 Resultados:
 ```
@@ -222,8 +225,9 @@ Percentage of the requests served within a certain time (ms)
 ```
 
 **HAProxy**
-
+```
 ab -n 500 -c 10 -g haproxy-load-balancer-300K.tsv http://127.0.0.1:80/307200
+```
 
 Resultados:
 ```
@@ -261,8 +265,9 @@ Percentage of the requests served within a certain time (ms)
 ```
 
 **Nginx**
-
+```
 ab -n 500 -c 10 -g nginx-load-balancer-300K.tsv http://127.0.0.1:80/307200
+```
 
 Resultados:
 ```
@@ -310,21 +315,53 @@ Percentage of the requests served within a certain time (ms)
 ### Tercer escenario
 - Cantidad de servidores a balancear: 8
 - Tipo de pedidos: GET con respuestas del servidor de 10K
-- Request totales: 5000
+- Request totales: 900
 - Request concurrentes: 20
 
 **Toy Load Balancer**
-
-ab -n 5000 -c 20 -g toy-load-balancer-eight.tsv http://127.0.0.1:3000/10240
+```
+ab -n 900 -c 20 -g toy-load-balancer-eight.tsv http://127.0.0.1:3000/10240
+```
 
 Resultados:
 ```
+Document Path:          /10240
+Document Length:        10279 bytes
 
+Concurrency Level:      20
+Time taken for tests:   1.426 seconds
+Complete requests:      900
+Failed requests:        0
+Total transferred:      9371700 bytes
+HTML transferred:       9251100 bytes
+Requests per second:    631.20 [#/sec] (mean)
+Time per request:       31.686 [ms] (mean)
+Time per request:       1.584 [ms] (mean, across all concurrent requests)
+Transfer rate:          6418.59 [Kbytes/sec] received
+
+Connection Times (ms)
+              min  mean[+/-sd] median   max
+Connect:        0    0   0.1      0       1
+Processing:     7   31  14.5     31     117
+Waiting:        7   31  14.5     31     117
+Total:          7   31  14.6     31     118
+
+Percentage of the requests served within a certain time (ms)
+  50%     31
+  66%     35
+  75%     38
+  80%     41
+  90%     44
+  95%     49
+  98%     79
+  99%    103
+ 100%    118 (longest request)
 ```
 
 **HAProxy**
-
-ab -n 5000 -c 20 -g ha-load-balancer-eight.tsv http://127.0.0.1:80/10240
+```
+ab -n 900 -c 20 -g ha-load-balancer-eight.tsv http://127.0.0.1:80/10240
+```
 
 Resultados:
 ```
@@ -332,38 +369,39 @@ Document Path:          /10240
 Document Length:        10254 bytes
 
 Concurrency Level:      20
-Time taken for tests:   6.089 seconds
-Complete requests:      5000
+Time taken for tests:   1.290 seconds
+Complete requests:      900
 Failed requests:        0
-Total transferred:      51775000 bytes
-HTML transferred:       51270000 bytes
-Requests per second:    821.22 [#/sec] (mean)
-Time per request:       24.354 [ms] (mean)
-Time per request:       1.218 [ms] (mean, across all concurrent requests)
-Transfer rate:          8304.42 [Kbytes/sec] received
+Total transferred:      9319500 bytes
+HTML transferred:       9228600 bytes
+Requests per second:    697.85 [#/sec] (mean)
+Time per request:       28.659 [ms] (mean)
+Time per request:       1.433 [ms] (mean, across all concurrent requests)
+Transfer rate:          7056.86 [Kbytes/sec] received
 
 Connection Times (ms)
               min  mean[+/-sd] median   max
-Connect:        0    0   0.1      0       4
-Processing:     3   24   8.5     25      65
-Waiting:        3   24   8.5     25      65
-Total:          5   24   8.5     25      65
+Connect:        0    0   0.1      0       1
+Processing:     6   28  10.6     29      62
+Waiting:        4   28  10.6     29      62
+Total:          6   28  10.6     29      62
 
 Percentage of the requests served within a certain time (ms)
-  50%     25
-  66%     28
-  75%     30
-  80%     32
-  90%     35
-  95%     36
-  98%     40
-  99%     43
- 100%     65 (longest request)
+  50%     29
+  66%     33
+  75%     36
+  80%     38
+  90%     41
+  95%     44
+  98%     53
+  99%     56
+ 100%     62 (longest request)
 ```
 
 **Nginx**
-
+```
 ab -n 5000 -c 20 -g nginx-load-balancer-eight.tsv http://127.0.0.1:81/10240
+```
 
 Resultados:
 ```
@@ -371,33 +409,33 @@ Document Path:          /10240
 Document Length:        10254 bytes
 
 Concurrency Level:      20
-Time taken for tests:   5.717 seconds
-Complete requests:      5000
+Time taken for tests:   1.206 seconds
+Complete requests:      900
 Failed requests:        0
-Total transferred:      51930000 bytes
-HTML transferred:       51270000 bytes
-Requests per second:    874.51 [#/sec] (mean)
-Time per request:       22.870 [ms] (mean)
-Time per request:       1.143 [ms] (mean, across all concurrent requests)
-Transfer rate:          8869.81 [Kbytes/sec] received
+Total transferred:      9347400 bytes
+HTML transferred:       9228600 bytes
+Requests per second:    746.37 [#/sec] (mean)
+Time per request:       26.796 [ms] (mean)
+Time per request:       1.340 [ms] (mean, across all concurrent requests)
+Transfer rate:          7570.12 [Kbytes/sec] received
 
 Connection Times (ms)
               min  mean[+/-sd] median   max
-Connect:        0    0   0.1      0       2
-Processing:     4   23   8.3     24      70
-Waiting:        4   23   8.3     24      70
-Total:          4   23   8.3     24      71
+Connect:        0    0   0.1      0       1
+Processing:     4   26   9.3     28      59
+Waiting:        4   26   9.3     28      59
+Total:          5   27   9.3     28      59
 
 Percentage of the requests served within a certain time (ms)
-  50%     24
-  66%     26
-  75%     28
-  80%     30
-  90%     33
-  95%     34
-  98%     36
-  99%     40
- 100%     71 (longest request)
+  50%     28
+  66%     31
+  75%     33
+  80%     35
+  90%     38
+  95%     40
+  98%     42
+  99%     45
+ 100%     59 (longest request)
  ```
 **Toy Load Balancer vs HAProxy**
 
