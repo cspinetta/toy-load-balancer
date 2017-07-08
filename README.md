@@ -11,7 +11,7 @@ cargo run
 ```
 
 ## Benchmarks
-A continuación presentamos un benchmark para comparar resultados entre nuestro load balancer y varios load balancer comerciales. Los load balancers que elegimos son HAProxy y nginx, y para realizar las pruebas utilizamos la herramienta Apache Benchmark. Para las pruebas utilizamos un server que responde a pedidos GET con respuestas de tamaño dinámico en base a un parámetro del request, la idea es tener varias instancias de este server y poder balancearlo. El código de estos servers se encuentra en server-example.js dentro del directorio examples.
+A continuación presentamos un benchmark para comparar resultados entre nuestro load balancer y varios load balancer comerciales. Los load balancers que elegimos son HAProxy y nginx, y para realizar las pruebas utilizamos la herramienta Apache Benchmark. Para las pruebas utilizamos un server que responde a pedidos GET con respuestas de tamaño dinámico en base a un parámetro del request, la idea es tener varias instancias de este server y poder balancearlo. El código de estos servers se encuentra en server-example.js dentro del directorio examples, y además de los resultados de ab en el README se pueden ver otros en la carpeta benches.
 
 Configuraciones del sistema:
 ```
@@ -369,33 +369,33 @@ Document Path:          /10240
 Document Length:        10254 bytes
 
 Concurrency Level:      20
-Time taken for tests:   6.089 seconds
-Complete requests:      5000
+Time taken for tests:   1.290 seconds
+Complete requests:      900
 Failed requests:        0
-Total transferred:      51775000 bytes
-HTML transferred:       51270000 bytes
-Requests per second:    821.22 [#/sec] (mean)
-Time per request:       24.354 [ms] (mean)
-Time per request:       1.218 [ms] (mean, across all concurrent requests)
-Transfer rate:          8304.42 [Kbytes/sec] received
+Total transferred:      9319500 bytes
+HTML transferred:       9228600 bytes
+Requests per second:    697.85 [#/sec] (mean)
+Time per request:       28.659 [ms] (mean)
+Time per request:       1.433 [ms] (mean, across all concurrent requests)
+Transfer rate:          7056.86 [Kbytes/sec] received
 
 Connection Times (ms)
               min  mean[+/-sd] median   max
-Connect:        0    0   0.1      0       4
-Processing:     3   24   8.5     25      65
-Waiting:        3   24   8.5     25      65
-Total:          5   24   8.5     25      65
+Connect:        0    0   0.1      0       1
+Processing:     6   28  10.6     29      62
+Waiting:        4   28  10.6     29      62
+Total:          6   28  10.6     29      62
 
 Percentage of the requests served within a certain time (ms)
-  50%     25
-  66%     28
-  75%     30
-  80%     32
-  90%     35
-  95%     36
-  98%     40
-  99%     43
- 100%     65 (longest request)
+  50%     29
+  66%     33
+  75%     36
+  80%     38
+  90%     41
+  95%     44
+  98%     53
+  99%     56
+ 100%     62 (longest request)
 ```
 
 **Nginx**
@@ -409,33 +409,33 @@ Document Path:          /10240
 Document Length:        10254 bytes
 
 Concurrency Level:      20
-Time taken for tests:   5.717 seconds
-Complete requests:      5000
+Time taken for tests:   1.206 seconds
+Complete requests:      900
 Failed requests:        0
-Total transferred:      51930000 bytes
-HTML transferred:       51270000 bytes
-Requests per second:    874.51 [#/sec] (mean)
-Time per request:       22.870 [ms] (mean)
-Time per request:       1.143 [ms] (mean, across all concurrent requests)
-Transfer rate:          8869.81 [Kbytes/sec] received
+Total transferred:      9347400 bytes
+HTML transferred:       9228600 bytes
+Requests per second:    746.37 [#/sec] (mean)
+Time per request:       26.796 [ms] (mean)
+Time per request:       1.340 [ms] (mean, across all concurrent requests)
+Transfer rate:          7570.12 [Kbytes/sec] received
 
 Connection Times (ms)
               min  mean[+/-sd] median   max
-Connect:        0    0   0.1      0       2
-Processing:     4   23   8.3     24      70
-Waiting:        4   23   8.3     24      70
-Total:          4   23   8.3     24      71
+Connect:        0    0   0.1      0       1
+Processing:     4   26   9.3     28      59
+Waiting:        4   26   9.3     28      59
+Total:          5   27   9.3     28      59
 
 Percentage of the requests served within a certain time (ms)
-  50%     24
-  66%     26
-  75%     28
-  80%     30
-  90%     33
-  95%     34
-  98%     36
-  99%     40
- 100%     71 (longest request)
+  50%     28
+  66%     31
+  75%     33
+  80%     35
+  90%     38
+  95%     40
+  98%     42
+  99%     45
+ 100%     59 (longest request)
  ```
 **Toy Load Balancer vs HAProxy**
 
