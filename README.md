@@ -137,7 +137,7 @@ Percentage of the requests served within a certain time (ms)
  ```
 **Toy Load Balancer vs HAProxy**
 
-![alt text](https://raw.githubusercontent.com/cspinetta/toy-load-balancer/master/resources/comparison-ha-toy-1K.png)
+![alt text](https://raw.githubusercontent.com/cspinetta/toy-load-balancer/master/comparison-ha-toy-1K.png)
 
 **Toy Load Balancer vs Nginx**
 
