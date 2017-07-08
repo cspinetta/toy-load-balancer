@@ -42,15 +42,21 @@ fn start_server() {
     let mut availables_servers: Vec<String> = Vec::new();
 
     let mut addr_value = String::new();
+    let mut caching = false;
+    let mut redis_conn = String::new();
 
     for i in 0..properties.len(){
         let (property,value) = properties[i].clone();
         if "server=" == property {
             addr_value = value;
 //            break;
-        } else {
+        } else if property.starts_with("host") {
             let s = value.clone();
             availables_servers.push(s);
+        } else if property.starts_with("caching") {
+            caching = value == "true"
+        } else if property.starts_with("redis-connection") {
+            redis_conn = value.clone()
         }
     }
 
@@ -61,9 +67,10 @@ fn start_server() {
 
     let n_threads = num_cpus::get();
     for i in 0..n_threads {
+        let redis_conn_ref = Arc::new(redis_conn.clone());
         let host_resolver_ref = host_resolver.clone();
         threads.push(thread::spawn(move || {
-            let server = Server::new(&addr, host_resolver_ref.clone());
+            let server = Server::new(&addr, host_resolver_ref.clone(), caching, redis_conn_ref.clone());
             server.start();
         }));
     }
