@@ -2,22 +2,64 @@ extern crate redis;
 
 use self::redis::Commands;
 use std::sync::Arc;
+use self::redis::{RedisError, ErrorKind};
 
-pub struct Cache{
-	pub con : redis::Connection
+
+pub trait Cache {
+
+    fn set(&self, key: String, value: String) -> redis::RedisResult<()>;
+
+    fn get(&self, key: String) -> redis::RedisResult<String>;
 }
 
-pub fn create_connection() -> redis::Connection {
-    let client = redis::Client::open("redis://127.0.0.1:6379/").expect("Connect to Redis");
-    return client.get_connection().unwrap();
+pub struct ImplCache {
+	pub con: Arc<redis::Connection>,
+    redis_conn: String
 }
 
-pub fn set(con: Arc<redis::Connection>, key: String, value: String) -> redis::RedisResult<()> {
-    let _ : () = try!(con.set(key, value));
-    Ok(())
+impl ImplCache {
+
+    pub fn new(redis_conn: String) -> ImplCache {
+        ImplCache { con: Arc::new(Self::create_connection(redis_conn.clone())), redis_conn: redis_conn.clone() }
+    }
+
+    fn create_connection(redis_conn: String) -> redis::Connection {
+        let client = redis::Client::open(redis_conn.clone().as_str()).expect("Create connection to Redis");
+        return client.get_connection().unwrap();
+    }
+
 }
 
-pub fn get(con: Arc<redis::Connection>, key: String) -> redis::RedisResult<String> {
-    let value : String  = try!(con.get(key));
-    Ok(value)
+impl Cache for ImplCache {
+
+    fn set(&self, key: String, value: String) -> redis::RedisResult<()> {
+        info!("Saving {} in Cache...", key);
+        let _ : () = try!(self.con.clone().set(key, value));
+        Ok(())
+    }
+
+    fn get(&self, key: String) -> redis::RedisResult<String> {
+        let value: String  = try!(self.con.clone().get(key));
+        Ok(value)
+    }
+}
+
+pub struct NoOpCache;
+
+impl NoOpCache {
+    pub fn new() -> NoOpCache {
+        NoOpCache {}
+    }
+}
+
+impl Cache for NoOpCache {
+    fn set(&self, key: String, value: String) -> redis::RedisResult<()> {
+        info!("NoOp Cache in save operation for key {}", key);
+        Ok(())
+    }
+
+    fn get(&self, key: String) -> redis::RedisResult<String> {
+        info!("NoOp Cache in save operation for key {}", key);
+        Err(RedisError::from((ErrorKind::NoScriptError, "No Op Cache")))
+    }
 }
