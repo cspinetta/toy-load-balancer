@@ -11,11 +11,11 @@ use tokio_core::reactor::Core;
 use tokio_core::net::TcpListener;
 
 use net2::unix::UnixTcpBuilderExt;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use std::net::SocketAddr;
 
 use router::Proxy;
-use server_manager::HostResolver;
+use host_resolver::HostResolver;
 
 
 pub struct Server<'a> {

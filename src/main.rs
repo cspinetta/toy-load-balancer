@@ -18,10 +18,10 @@ use std::sync::Mutex;
 
 mod router;
 mod server;
-mod server_manager;
+mod host_resolver;
 mod file_utils;
 
-use server_manager::HostResolver;
+use host_resolver::HostResolver;
 use server::Server;
 use router::Router;
 use file_utils::FileReader;

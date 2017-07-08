@@ -10,10 +10,9 @@ use hyper::client::HttpConnector;
 use hyper::error::UriError;
 use hyper::Get;
 
-use std::sync::{Arc, Mutex};
-use std::io::{self, Write};
+use std::sync::Arc;
 
-use server_manager::HostResolver;
+use host_resolver::HostResolver;
 
 #[derive(Clone)]
 pub struct Proxy {
@@ -90,7 +89,7 @@ impl Router {
                 Ok(client_resp) => {
                     if client_resp.status() == hyper::StatusCode::Ok {
                         Box::new(FutureOk(client_resp))
-                    } else if n_retry < *ref_max.clone() {
+                    } else if (n_retry < *ref_max.clone()) && (*cloned_req.method() == Get) {
                         self.dispatch_request(&client_clone, Self::clone_req(&cloned_req), n_retry + 1)
                     } else {
                         Box::new(FutureOk(Response::new().with_status(StatusCode::ServiceUnavailable)))

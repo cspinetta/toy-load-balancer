@@ -2,15 +2,7 @@
 
 extern crate rand;
 
-use std::io::{self, Write};
-use std::sync::mpsc::{TryRecvError};
-use server_manager::rand::Rng;
-use ipc_channel::router::RouterProxy;
-use ipc_channel::ipc::{IpcSender, IpcReceiverSet};
-use std::sync::{Arc, Mutex};
-use file_utils::FileReader;
-
-use std::collections::HashMap;
+use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 pub struct HostResolver {
