@@ -17,7 +17,7 @@ use std::net::SocketAddr;
 use router::Proxy;
 use host_resolver::HostResolver;
 
-use redis_service::{Cache, ImplCache, NoOpCache};
+use redis_service::{Cache, RedisCache, NoOpCache};
 
 
 pub struct Server<'a> {
@@ -43,7 +43,7 @@ impl<'a> Server<'a> {
 
         let listener = TcpListener::from_listener(listener, self.addr, &handle).unwrap();
         let cache: Arc<Cache> = if self.caching {
-            Arc::new(ImplCache::new((*self.redis_conn).clone()))
+            Arc::new(RedisCache::new((*self.redis_conn).clone()))
         } else {
             Arc::new(NoOpCache::new())
         };

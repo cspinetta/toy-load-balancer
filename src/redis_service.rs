@@ -13,15 +13,15 @@ pub trait Cache {
     fn get(&self, key: &str) -> redis::RedisResult<String>;
 }
 
-pub struct ImplCache {
+pub struct RedisCache {
 	con: Arc<Mutex<RedisResult<redis::Connection>>>,
     redis_conn: Arc<String>
 }
 
-impl ImplCache {
+impl RedisCache {
 
-    pub fn new(redis_conn: String) -> ImplCache {
-        ImplCache { con: Arc::new(Mutex::new(Self::create_connection(redis_conn.clone()))), redis_conn: Arc::new(redis_conn.clone()) }
+    pub fn new(redis_conn: String) -> RedisCache {
+        RedisCache { con: Arc::new(Mutex::new(Self::create_connection(redis_conn.clone()))), redis_conn: Arc::new(redis_conn.clone()) }
     }
 
     fn create_connection(redis_conn: String) -> RedisResult<redis::Connection> {
@@ -33,28 +33,33 @@ impl ImplCache {
         conn
     }
 
+    fn execute<T, F>(&self, action_func: T) -> redis::RedisResult<F>
+        where T: FnOnce(&redis::Connection) -> redis::RedisResult<F> {
+        let redis_result = match self.con.lock() {
+            Ok(conn_result) =>
+                match conn_result.as_ref() {
+                    Ok(c) => action_func(c),
+                    Err(e) => Err(RedisError::from((ErrorKind::NoScriptError, "No connection acquired")))
+                },
+            Err(e) => Err(RedisError::from((ErrorKind::NoScriptError, "No lock for get cache connection")))
+        };
+        redis_result
+    }
+
 }
 
-impl Cache for ImplCache {
+impl Cache for RedisCache {
 
     fn set(&self, key: &str, value: String) -> redis::RedisResult<()> {
         info!("Enter to save {} in Cache...", key);
-        let redis_result = match self.con.lock() {
-            Ok(conn_result) => {
-                match conn_result.as_ref() {
-                    Ok(c) => {
-                        info!("Saving {} in Cache...", key);
-                        c.set(key.clone(), value.clone())
-                            .map_err(|error| {
-                                error!("Failed trying to save {} on Redis", key.clone());
-                                error
-                            })
-                    },
-                    Err(e) => Err(RedisError::from((ErrorKind::NoScriptError, "No connection acquired")))
-                }
-            },
-            Err(e) => Err(RedisError::from((ErrorKind::NoScriptError, "No lock for get cache connection")))
-        };
+        let redis_result = self.execute(|conn| {
+            info!("Saving {} in Cache...", key);
+            conn.set(key.clone(), value.clone())
+                .map_err(|error| {
+                    error!("Failed trying to save {} on Redis", key.clone());
+                    error
+                })
+        });
         redis_result.as_ref().map_err(|e| {
             error!("Failed Redis operation: {:?}", e);
         });
@@ -63,21 +68,14 @@ impl Cache for ImplCache {
 
     fn get(&self, key: &str) -> redis::RedisResult<String> {
         info!("Enter to get {} in Cache...", key);
-        let redis_result = match self.con.lock() {
-            Ok(conn_result) =>
-                match conn_result.as_ref() {
-                    Ok(c) => {
-                        info!("Saving {} in Cache...", key);
-                        c.get(key.clone())
-                            .map_err(|error| {
-                                error!("Failed trying to fetch {} from Redis", key.clone());
-                                error
-                            })
-                    },
-                    Err(e) => Err(RedisError::from((ErrorKind::NoScriptError, "No connection acquired")))
-                },
-            Err(e) => Err(RedisError::from((ErrorKind::NoScriptError, "No lock for get cache connection")))
-        };
+        let redis_result = self.execute(|conn| {
+            info!("Saving {} in Cache...", key);
+            conn.get(key.clone())
+                .map_err(|error| {
+                    error!("Failed trying to save {} on Redis", key.clone());
+                    error
+                })
+        });
         redis_result.as_ref().map_err(|e| {
             error!("Failed Redis operation: {:?}", e);
         });
