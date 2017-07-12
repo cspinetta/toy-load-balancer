@@ -29,7 +29,6 @@ impl ImplCache {
         let conn = client.get_connection();
         conn.as_ref().map_err(|e| {
             error!("Failed trying to connect to Redis on {}", redis_conn);
-            e
         });
         conn
     }
@@ -40,8 +39,7 @@ impl Cache for ImplCache {
 
     fn set(&self, key: &str, value: String) -> redis::RedisResult<()> {
         info!("Enter to save {} in Cache...", key);
-        let lock = self.con.lock();
-        match lock {
+        let redis_result = match self.con.lock() {
             Ok(conn_result) => {
                 match conn_result.as_ref() {
                     Ok(c) => {
@@ -56,12 +54,16 @@ impl Cache for ImplCache {
                 }
             },
             Err(e) => Err(RedisError::from((ErrorKind::NoScriptError, "No lock for get cache connection")))
-        }
+        };
+        redis_result.as_ref().map_err(|e| {
+            error!("Failed Redis operation: {:?}", e);
+        });
+        redis_result
     }
 
     fn get(&self, key: &str) -> redis::RedisResult<String> {
         info!("Enter to get {} in Cache...", key);
-        match self.con.lock() {
+        let redis_result = match self.con.lock() {
             Ok(conn_result) =>
                 match conn_result.as_ref() {
                     Ok(c) => {
@@ -75,7 +77,11 @@ impl Cache for ImplCache {
                     Err(e) => Err(RedisError::from((ErrorKind::NoScriptError, "No connection acquired")))
                 },
             Err(e) => Err(RedisError::from((ErrorKind::NoScriptError, "No lock for get cache connection")))
-        }
+        };
+        redis_result.as_ref().map_err(|e| {
+            error!("Failed Redis operation: {:?}", e);
+        });
+        redis_result
     }
 }
 
