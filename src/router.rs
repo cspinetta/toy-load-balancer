@@ -39,14 +39,6 @@ impl Service for Proxy {
     type Future = Box<Future<Item=Self::Response, Error = Self::Error>>;
 
     fn call(&self, req: Self::Request) -> Self::Future {
-		let mut caching = String::new();
-		let properties = FileReader::read().unwrap();
-        for i in 0..properties.len(){
-	        let (property,value) = properties[i].clone();
-	        if "caching=" == property {
-	            caching = value.clone();
-	        } 
-	    }
         info!("Dispatching request: {:?}", &req);
         Router::new(self.host_resolver.clone(), self.cache.clone())
             .dispatch_request(&self.client, req)
@@ -107,8 +99,8 @@ impl Router {
 
     fn with_cache(self, client: &Client<HttpConnector, Body>, req: Request<Body>) -> Box<Future<Error=hyper::Error, Item=Response>> {
         let cache_key = Self::cache_key(&req);
-        let cache_ref = self.cache.clone();
-        let cache_response = cache_ref.clone().get(cache_key.clone());
+        let cache_ref: Arc<Cache> = self.cache.clone();
+        let cache_response = cache_ref.clone().get(&cache_key[..]);
         let resp: Box<Future<Error=hyper::Error, Item=Response>> = match cache_response {
             Ok(response) =>  {
                 info!("Response from Redis: {:?}", response);
@@ -125,7 +117,7 @@ impl Router {
                                 futures::future::ok::<_, hyper::Error>(acc)
                             })
                             .map(move |body| {
-                                cache_ref.clone().set(cache_key.clone(), String::from_utf8(body.clone()).unwrap());
+                                cache_ref.clone().set(&cache_key.clone()[..], String::from_utf8(body.clone()).unwrap());
                                 let body_str = String::from_utf8(body).unwrap();
                                 let resp: Response<Body> = Response::new()
                                     .with_header(ContentLength(body_str.len() as u64))
