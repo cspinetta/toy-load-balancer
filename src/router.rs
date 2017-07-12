@@ -110,6 +110,8 @@ impl Router {
                 let resp = self
                     .forward_to_server(client, req, 1)
                     .and_then(move |response| {
+                        let original_headers = response.headers().clone();
+                        let original_status = response.status().clone();
                         let resp = response
                             .body()
                             .fold(Vec::new(), |mut acc, chunk| {
@@ -117,10 +119,14 @@ impl Router {
                                 futures::future::ok::<_, hyper::Error>(acc)
                             })
                             .map(move |body| {
-                                cache_ref.clone().set(&cache_key.clone()[..], String::from_utf8(body.clone()).unwrap());
+                                if original_status == StatusCode::Ok {
+                                    cache_ref.clone().set(&cache_key.clone()[..], String::from_utf8(body.clone()).unwrap());
+                                }
                                 let body_str = String::from_utf8(body).unwrap();
                                 let resp: Response<Body> = Response::new()
+                                    .with_headers(original_headers)
                                     .with_header(ContentLength(body_str.len() as u64))
+                                    .with_status(original_status)
                                     .with_body(body_str.clone());
                                 resp
                             });
