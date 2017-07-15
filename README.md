@@ -1,13 +1,33 @@
 Toy Load Balancer
 =================================
-A little example of a Load Balancer on HTTP protocol.
+A minimalistic Load Balancer on top of HTTP protocol.
 
 Written in [Rust] language.
 
 ## Start server
 
+Update config file: `config-file.txt`
+
+And execute from the terminal:
+
 ```bash
 cargo run
+```
+
+## Start TEST server
+
+```bash
+cargo run --example server-test 0.0.0.0:3001
+```
+
+Some curls:
+
+```bash
+curl -i 'http://localhost:3001/ping'
+curl -i 'http://localhost:3001/medium-payload'
+curl -i 'http://localhost:3001/large-payload'
+curl -i 'http://localhost:3001/custom-payload?size=100'
+curl -i -X POST -d 'some body' 'http://localhost:3001/echo'
 ```
 
 ## Benchmarks

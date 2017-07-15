@@ -7,8 +7,12 @@ extern crate futures;
 extern crate tokio_core;
 //extern crate tokio_pool;
 extern crate num_cpus;
+extern crate url;
 
-use std::{iter, env};
+use url::{Url, ParseError};
+use std::collections::HashMap;
+
+use std::{iter, env, cmp};
 
 use futures::future::FutureResult;
 
@@ -36,10 +40,14 @@ fn main() {
     start_server(addr);
 }
 
+static PAYLOAD_SIZE_DEFAULT: i32 = 1024;
+static MAX_PAYLOAD_SIZE: i32 = 1024 * 400;
+
 struct PayloadGenerator;
 impl PayloadGenerator {
-    fn generate_string(n: usize) -> Vec<u8> {
-        iter::repeat('a').take(n).map(|x| x as u8).collect::<Vec<u8>>()
+    fn generate_string(n: i32) -> Vec<u8> {
+        let size = cmp::min(n, MAX_PAYLOAD_SIZE);
+        (0..size).map({ |_| "X" }).collect::<Vec<_>>().concat().as_bytes().to_vec()
     }
     fn medium_string() -> Vec<u8> {
         Self::generate_string(20 * 1024) // 20 kb
@@ -71,6 +79,7 @@ impl ServiceHandler {
     }
 
     fn make_response(payload: Vec<u8>) -> Response {
+        info!("Building response with {} bytes as payload", payload.len() as u64);
         Response::new()
             .with_header(ContentLength(payload.len() as u64))
             .with_body(payload)
@@ -84,6 +93,7 @@ impl Service for ServiceHandler {
     type Future = FutureResult<Response, hyper::Error>;
 
     fn call(&self, req: Request) -> Self::Future {
+        info!("Incoming request: {} - {}.", req.method(), req.path());
         let response = match (req.method(), req.path()) {
             (&Get, "/") => {
                 Response::new()
@@ -99,9 +109,16 @@ impl Service for ServiceHandler {
             (&Get, "/large-payload") => {
                 Self::make_response(PayloadGenerator::large_string())
             },
-//            (&Get, "/custom-payload") => {
-//                Self::make_response(PayloadGenerator::large_string())
-//            },
+            (&Get, "/custom-payload") => {
+
+                let query = url::form_urlencoded::parse(req.query().unwrap_or("").as_bytes());
+                let query_string_map: HashMap<String, String> = query.into_owned().collect();
+                let size: i32 = query_string_map
+                    .get(&String::from("size"))
+                    .and_then(|v| { v.parse::<i32>().ok()})
+                    .unwrap_or(PAYLOAD_SIZE_DEFAULT);
+                Self::make_response(PayloadGenerator::generate_string(size))
+            },
             (&Post, "/echo") => {
                 let mut res = Response::new();
                 if let Some(len) = req.headers().get::<ContentLength>() {
