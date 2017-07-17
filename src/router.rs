@@ -15,7 +15,7 @@ use hyper::header::ContentLength;
 use std::sync::Arc;
 
 use host_resolver::HostResolver;
-use redis_service::Cache;
+use cache::Cache;
 
 #[derive(Clone)]
 pub struct Proxy {

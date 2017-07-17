@@ -19,7 +19,7 @@ use std::net::SocketAddr;
 use router::Proxy;
 use host_resolver::HostResolver;
 
-use redis_service::{Cache, RedisCache, NoOpCache};
+use cache::{Cache, RedisCache, NoOpCache};
 
 
 pub struct Server<'a> {

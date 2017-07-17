@@ -24,7 +24,7 @@ mod settings;
 mod router;
 mod server;
 mod host_resolver;
-mod redis_service;
+mod cache;
 
 use settings::Settings;
 use host_resolver::HostResolver;
