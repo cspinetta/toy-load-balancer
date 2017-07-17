@@ -2,6 +2,8 @@
 extern crate net2;
 extern crate hyper;
 
+use settings::Settings;
+
 use futures::{Stream, Future};
 
 use hyper::server::Http;
@@ -23,14 +25,13 @@ use redis_service::{Cache, RedisCache, NoOpCache};
 pub struct Server<'a> {
     addr: &'a SocketAddr,
     host_resolver:  Arc<HostResolver>,
-    caching: bool,
-    redis_conn: Arc<String>,
+    settings: Arc<Settings>
 }
 
 impl<'a> Server<'a> {
 
-    pub fn new(addr: &'a SocketAddr, host_resolver:  Arc<HostResolver>, caching: bool, redis_conn: Arc<String>) -> Server<'a> {
-        Server { addr: addr, host_resolver: host_resolver, caching: caching, redis_conn: redis_conn }
+    pub fn new(addr: &'a SocketAddr, host_resolver:  Arc<HostResolver>, settings: Arc<Settings>) -> Server<'a> {
+        Server { addr: addr, host_resolver: host_resolver, settings: settings }
     }
 
     pub fn start(self) {
@@ -42,8 +43,8 @@ impl<'a> Server<'a> {
             .listen(128).unwrap();
 
         let listener = TcpListener::from_listener(listener, self.addr, &handle).unwrap();
-        let cache: Arc<Cache> = if self.caching {
-            Arc::new(RedisCache::new((*self.redis_conn).clone()))
+        let cache: Arc<Cache> = if self.settings.cache.enable {
+            Arc::new(RedisCache::new(self.settings.cache.redis.connection.clone()))
         } else {
             Arc::new(NoOpCache::new())
         };

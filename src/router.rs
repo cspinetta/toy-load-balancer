@@ -16,7 +16,6 @@ use std::sync::Arc;
 
 use host_resolver::HostResolver;
 use redis_service::Cache;
-use file_utils::FileReader;
 
 #[derive(Clone)]
 pub struct Proxy {
@@ -71,7 +70,7 @@ impl Router {
     }
 
     fn create_url(host: &str, uri: Uri) -> Result<Uri, UriError> {
-        format!("{}{}{}", host, uri.path(), uri.query().unwrap_or("")).parse()
+        format!("http://{}{}{}", host, uri.path(), uri.query().unwrap_or("")).parse()
     }
 
     fn req_is_cacheable(req: & Request<Body>) -> bool {
