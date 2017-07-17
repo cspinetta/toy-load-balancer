@@ -6,7 +6,7 @@ Written in [Rust] language.
 
 ## Start server
 
-Update config file: `config-file.txt`
+Add settings if it's necessary override the default one: `/config/local.toml`
 
 And execute from the terminal:
 
