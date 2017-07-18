@@ -113,20 +113,16 @@ impl Router {
                         let original_status = response.status().clone();
                         let resp = response
                             .body()
-                            .fold(Vec::new(), |mut acc, chunk| {
-                                acc.extend_from_slice(&*chunk);
-                                futures::future::ok::<_, hyper::Error>(acc)
-                            })
+                            .concat2()
                             .map(move |body| {
                                 if original_status == StatusCode::Ok {
-                                    cache_ref.clone().set(&cache_key.clone()[..], String::from_utf8(body.clone()).unwrap());
+                                    cache_ref.clone().set(&cache_key.clone()[..], body.as_ref().clone().to_vec());
                                 }
-                                let body_str = String::from_utf8(body).unwrap();
                                 let resp: Response<Body> = Response::new()
                                     .with_headers(original_headers)
-                                    .with_header(ContentLength(body_str.len() as u64))
+                                    .with_header(ContentLength(body.len() as u64))
                                     .with_status(original_status)
-                                    .with_body(body_str.clone());
+                                    .with_body(body.as_ref().clone().to_vec());
                                 resp
                             });
                         Box::new(resp)

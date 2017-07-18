@@ -8,9 +8,9 @@ use self::redis::{RedisError, ErrorKind, RedisResult, ToRedisArgs};
 
 pub trait Cache {
 
-    fn set(&self, key: &str, value: String) -> redis::RedisResult<()>;
+    fn set(&self, key: &str, value: Vec<u8>) -> redis::RedisResult<()>;
 
-    fn get(&self, key: &str) -> redis::RedisResult<String>;
+    fn get(&self, key: &str) -> redis::RedisResult<Vec<u8>>;
 }
 
 pub struct RedisCache {
@@ -50,7 +50,7 @@ impl RedisCache {
 
 impl Cache for RedisCache {
 
-    fn set(&self, key: &str, value: String) -> redis::RedisResult<()> {
+    fn set(&self, key: &str, value: Vec<u8>) -> redis::RedisResult<()> {
         info!("Enter to save {} in Cache...", key);
         let redis_result = self.execute(|conn| {
             info!("Saving {} in Cache...", key);
@@ -66,7 +66,7 @@ impl Cache for RedisCache {
         redis_result
     }
 
-    fn get(&self, key: &str) -> redis::RedisResult<String> {
+    fn get(&self, key: &str) -> redis::RedisResult<Vec<u8>> {
         info!("Enter to get {} in Cache...", key);
         let redis_result = self.execute(|conn| {
             info!("Saving {} in Cache...", key);
@@ -92,12 +92,12 @@ impl NoOpCache {
 }
 
 impl Cache for NoOpCache {
-    fn set(&self, key: &str, value: String) -> redis::RedisResult<()> {
+    fn set(&self, key: &str, value: Vec<u8>) -> redis::RedisResult<()> {
         info!("NoOp Cache in save operation for key {}", key);
         Ok(())
     }
 
-    fn get(&self, key: &str) -> redis::RedisResult<String> {
+    fn get(&self, key: &str) -> redis::RedisResult<Vec<u8>> {
         info!("NoOp Cache in save operation for key {}", key);
         Err(RedisError::from((ErrorKind::NoScriptError, "No Op Cache")))
     }
