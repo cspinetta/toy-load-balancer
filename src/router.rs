@@ -61,6 +61,20 @@ struct RequestHead {
     pub headers: Headers
 }
 
+impl RequestHead {
+    fn new(version: HttpVersion, method: Method, uri: Uri, headers: Headers) -> RequestHead {
+        RequestHead { version, method, uri, headers }
+    }
+
+    fn from_request(req: &Request) -> Self {
+        Self::new(req.version().clone(), req.method().clone(), req.uri().clone(), req.headers().clone())
+    }
+
+    fn with_uri(&self, uri: Uri) -> RequestHead {
+        Self::new(self.version.clone(), self.method.clone(), uri, self.headers.clone())
+    }
+}
+
 #[derive(Clone)]
 pub struct Router {
     max_retry: Arc<u32>,
@@ -75,7 +89,8 @@ impl Router {
     }
 
     fn create_url(host: &str, uri: Uri) -> Result<Uri, UriError> {
-        format!("http://{}{}{}", host, uri.path(), uri.query().unwrap_or("")).parse()
+        let query_string = uri.query().map(|str| { format!("?{}", str) }).unwrap_or(String::from(""));
+        format!("http://{}{}{}", host, uri.path(), query_string).parse()
     }
 
     fn req_is_cacheable(req: & Request<Body>) -> bool {
@@ -131,89 +146,51 @@ impl Router {
         resp
     }
 
-    fn clone_req_without_body(req: &Request) -> Request {
-        let mut new_req = Request::new(req.method().clone(), req.uri().clone());
-        new_req.headers_mut().extend(req.headers().iter());
-        new_req.set_version(req.version());
-        new_req
-    }
-
-    fn head_of_req(req: &Request) -> RequestHead {
-        RequestHead {
-            method: req.method().clone(),
-            uri: req.uri().clone(),
-            headers: req.headers().clone(),
-            version: req.version().clone(),
-        }
-    }
-
-    fn clone_req_custom_uri(req: &Request, uri: &Uri) -> Request {
-        let mut new_req = Request::new(req.method().clone(), uri.clone());
-        new_req.headers_mut().extend(req.headers().iter());
-        new_req
-    }
-
-    fn map_req(&self, req: Request) -> Request {
-        let host = self.host_resolver.clone().get_next();
-        let uri = Self::create_url(host.as_ref(), req.uri().clone())
-            .expect(&format!("Failed trying to parse uri. Origin: {:?}", &req.uri()));
-        Self::clone_req_custom_uri(&req, &uri)
-    }
-
     fn forward_to_server(self, client: &Client<HttpConnector, Body>, req: Request<Body>, n_retry: u32) -> Box<Future<Error=hyper::Error, Item=Response>>
     {
 
         let client_clone = client.clone();
         let ref_max = self.max_retry.clone();
 
-        let mut head = Self::head_of_req(&req);
-        let with_new_host = self.uri_with_new_host(&head.uri);
-        head.uri = with_new_host;
-//        let shared_body = Rc::new(req.body()
-//            .fold(Vec::new(), |mut acc, chunk| {
-//                acc.extend_from_slice(&*chunk);
-//                futures::future::ok::<_, hyper::Error>(acc)
-//            }));
+        let with_new_host = self.uri_with_new_host(&req.uri());
+        let head = RequestHead::from_request(&req).with_uri(with_new_host);
+
         let shared_body: Concat2<Body> = req.body().concat2();
 
-        let r = shared_body.and_then(move |chunk| {
+        let r = shared_body.and_then(move |whole_body| {
 
-            let new_req = Self::build_req(&head.clone(), chunk);
+            let new_req = Self::build_req(&head.clone(), Self::copy_body(&whole_body));
 
     //        let cloned_req = self.map_req(Self::clone_req(&req));
 
             info!("Attemp {} for url: {:?}", n_retry, new_req);
 
-            let resp = client_clone.clone().request(new_req).then(move |result| {
+            let resp = client_clone.request(new_req).then(move |result| {
                 debug!("Max retry: {}. Current attemp: {}", ref_max.clone(), n_retry);
                 match result {
                     Ok(client_resp) => Box::new(FutureOk(client_resp)),
                     Err(e) => {
                         error!("Connection error: {:?}", &e);
-    //                    if (n_retry < *ref_max.clone()) && (*cloned_req.method() == Get) {
-    //                        self.forward_to_server(&client_clone, Self::clone_req(&cloned_req), n_retry + 1)
-    //                    } else {
+                        if (n_retry < *ref_max.clone()) && (head.method == Get) {
+
+                            let new_req = Self::build_req(&head.clone(), Self::copy_body(&whole_body));
+                            self.forward_to_server(&client_clone, new_req, n_retry + 1)
+                        } else {
                             Box::new(FutureOk(Response::new().with_status(StatusCode::ServiceUnavailable)))
-    //                    }
+                        }
 
                     }
                 }
             });
             Box::new(resp)
-//            Box::new(FutureOk(Response::new().with_status(StatusCode::ServiceUnavailable)))
         });
         Box::new(r)
-//        r
     }
 
     fn build_req(head: &RequestHead, body: Chunk) -> Request {
         let mut new_req = Request::new(head.method.clone(), head.uri.clone());
         new_req.headers_mut().extend(head.headers.iter());
         new_req.set_version(head.version.clone());
-
-//        let all_body = body.iter()
-//            .cloned()
-//            .collect::<Vec<u8>>();
         new_req.set_body(body);
         new_req
     }
@@ -222,6 +199,10 @@ impl Router {
         let host = self.host_resolver.clone().get_next();
         Self::create_url(host.as_ref(), uri.clone())
             .expect(&format!("Failed trying to parse uri. Origin: {:?}", uri))
+    }
+
+    fn copy_body(chunk_ref: &Chunk) -> Chunk {
+        Chunk::from(chunk_ref.as_ref().clone().to_vec())
     }
 
     fn with_new_host(&self, req: &mut Request) {
