@@ -8,20 +8,23 @@ use self::redis::{RedisError, ErrorKind, RedisResult, ToRedisArgs};
 
 pub trait Cache {
 
+    fn max_length(&self) -> u64;
+
     fn set(&self, key: &str, value: Vec<u8>) -> redis::RedisResult<()>;
 
     fn get(&self, key: &str) -> redis::RedisResult<Vec<u8>>;
 }
 
 pub struct RedisCache {
+    max_length: u64,
 	con: Arc<Mutex<RedisResult<redis::Connection>>>,
     redis_conn: Arc<String>
 }
 
 impl RedisCache {
 
-    pub fn new(redis_conn: String) -> RedisCache {
-        RedisCache { con: Arc::new(Mutex::new(Self::create_connection(redis_conn.clone()))), redis_conn: Arc::new(redis_conn.clone()) }
+    pub fn new(max_length: u64, redis_conn: String) -> RedisCache {
+        RedisCache { max_length: max_length, con: Arc::new(Mutex::new(Self::create_connection(redis_conn.clone()))), redis_conn: Arc::new(redis_conn.clone()) }
     }
 
     fn create_connection(redis_conn: String) -> RedisResult<redis::Connection> {
@@ -49,6 +52,8 @@ impl RedisCache {
 }
 
 impl Cache for RedisCache {
+
+    fn max_length(&self) -> u64 { self.max_length }
 
     fn set(&self, key: &str, value: Vec<u8>) -> redis::RedisResult<()> {
         info!("Enter to save {} in Cache...", key);
@@ -92,6 +97,9 @@ impl NoOpCache {
 }
 
 impl Cache for NoOpCache {
+
+    fn max_length(&self) -> u64 { 0u64 }
+
     fn set(&self, key: &str, value: Vec<u8>) -> redis::RedisResult<()> {
         info!("NoOp Cache in save operation for key {}", key);
         Ok(())

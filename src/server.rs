@@ -44,7 +44,7 @@ impl<'a> Server<'a> {
 
         let listener = TcpListener::from_listener(listener, self.addr, &handle).unwrap();
         let cache: Arc<Cache> = if self.settings.cache.enable {
-            Arc::new(RedisCache::new(self.settings.cache.redis.connection.clone()))
+            Arc::new(RedisCache::new(self.settings.cache.max_length, self.settings.cache.redis.connection.clone()))
         } else {
             Arc::new(NoOpCache::new())
         };

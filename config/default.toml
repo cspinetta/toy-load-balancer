@@ -10,6 +10,7 @@ address = [ "0.0.0.0:8081", "0.0.0.0:8082" ]
 
 [cache]
 enable = true
+max_length = 1024
 
   [cache.redis]
   connection = "redis://127.0.0.1:6379/"

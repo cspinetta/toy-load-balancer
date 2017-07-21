@@ -20,6 +20,7 @@ pub struct RedisSettings {
 #[derive(Debug, Deserialize)]
 pub struct Cache {
     pub enable: bool,
+    pub max_length: u64,
     pub redis: RedisSettings,
 }
 

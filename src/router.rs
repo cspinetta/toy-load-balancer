@@ -18,6 +18,7 @@ use hyper::header::ContentLength;
 use hyper::HttpVersion;
 use hyper::Method;
 use hyper::Chunk;
+use std::cell::RefCell;
 
 use std::sync::Arc;
 
@@ -122,23 +123,44 @@ impl Router {
                 let resp = self
                     .forward_to_server(client, req, 1)
                     .and_then(move |response| {
+                        let max_length_cache = cache_ref.clone().max_length();
                         let original_headers = response.headers().clone();
                         let original_status = response.status().clone();
-                        let resp = response
-                            .body()
-                            .concat2()
-                            .map(move |body| {
-                                if original_status == StatusCode::Ok {
-                                    cache_ref.clone().set(&cache_key.clone()[..], body.as_ref().clone().to_vec());
+
+                        let mut is_large = false;
+                        let mut content_length: Option<u64> = Option::None;
+                        {
+                            content_length = response.headers().get::<ContentLength>().map(|length| {length.0});
+                        }
+                        info!("Content length: {:?}", content_length);
+                        let r: Box<Future<Error=hyper::Error, Item=Response>> = match content_length {
+                            Some(length) if length <= max_length_cache => {
+                                let resp = response
+                                    .body()
+                                    .concat2()
+                                    .map(move |body| {
+                                        if original_status == StatusCode::Ok {
+                                            cache_ref.clone().set(&cache_key.clone()[..], body.as_ref().clone().to_vec());
+                                        }
+                                        let resp: Response<Body> = Response::new()
+                                            .with_headers(original_headers)
+                                            .with_header(ContentLength(body.len() as u64))
+                                            .with_status(original_status)
+                                            .with_body(body.as_ref().clone().to_vec());
+                                        resp
+                                    });
+                                Box::new(resp)
+                            },
+                            _ => {
+                                let mut res = Response::new();
+                                if let Some(len) = response.headers().get::<ContentLength>() {
+                                    res.headers_mut().set(len.clone());
                                 }
-                                let resp: Response<Body> = Response::new()
-                                    .with_headers(original_headers)
-                                    .with_header(ContentLength(body.len() as u64))
-                                    .with_status(original_status)
-                                    .with_body(body.as_ref().clone().to_vec());
-                                resp
-                            });
-                        Box::new(resp)
+                                res.set_body(response.body());
+                                Box::new(FutureOk(res))
+                            }
+                        };
+                        Box::new(r)
                     });
                 Box::new(resp)
             }
