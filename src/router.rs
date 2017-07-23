@@ -19,6 +19,7 @@ use hyper::HttpVersion;
 use hyper::Method;
 use hyper::Chunk;
 use std::cell::RefCell;
+use request_utils::{get_content_length, get_content_length_req};
 
 use std::sync::Arc;
 
@@ -126,12 +127,7 @@ impl Router {
                         let max_length_cache = cache_ref.clone().max_length();
                         let original_headers = response.headers().clone();
                         let original_status = response.status().clone();
-
-                        let mut is_large = false;
-                        let mut content_length: Option<u64> = Option::None;
-                        {
-                            content_length = response.headers().get::<ContentLength>().map(|length| {length.0});
-                        }
+                        let content_length = get_content_length(&response);
                         info!("Content length: {:?}", content_length);
                         let r: Box<Future<Error=hyper::Error, Item=Response>> = match content_length {
                             Some(length) if length <= max_length_cache => {
@@ -171,42 +167,63 @@ impl Router {
     fn forward_to_server(self, client: &Client<HttpConnector, Body>, req: Request<Body>, n_retry: u32) -> Box<Future<Error=hyper::Error, Item=Response>>
     {
 
+        let max_length_cache = self.cache.clone().max_length();
         let client_clone = client.clone();
         let ref_max = self.max_retry.clone();
 
         let with_new_host = self.uri_with_new_host(&req.uri());
         let head = RequestHead::from_request(&req).with_uri(with_new_host);
 
-        let shared_body: Concat2<Body> = req.body().concat2();
+        let content_length = get_content_length_req(&req);
 
-        let r = shared_body.and_then(move |whole_body| {
+        match content_length {
+            Some(length) if length <= max_length_cache => {
+                info!("The request has a small length, so it's possible to retry. Content Length: {}", length);
+                let shared_body: Concat2<Body> = req.body().concat2();
 
-            let new_req = Self::build_req(&head.clone(), Self::copy_body(&whole_body));
+                let r = shared_body.and_then(move |whole_body| {
 
-    //        let cloned_req = self.map_req(Self::clone_req(&req));
+                    let new_req = Self::build_req(&head.clone(), Self::copy_body(&whole_body));
 
-            info!("Attemp {} for url: {:?}", n_retry, new_req);
+                    info!("Attemp {} for url: {:?}", n_retry, new_req);
 
-            let resp = client_clone.request(new_req).then(move |result| {
-                debug!("Max retry: {}. Current attemp: {}", ref_max.clone(), n_retry);
-                match result {
-                    Ok(client_resp) => Box::new(FutureOk(client_resp)),
-                    Err(e) => {
-                        error!("Connection error: {:?}", &e);
-                        if (n_retry < *ref_max.clone()) && (head.method == Get) {
+                    let resp = client_clone.request(new_req).then(move |result| {
+                        debug!("Max retry: {}. Current attemp: {}", ref_max.clone(), n_retry);
+                        match result {
+                            Ok(client_resp) => Box::new(FutureOk(client_resp)),
+                            Err(e) => {
+                                error!("Connection error: {:?}", &e);
+                                if (n_retry < *ref_max.clone()) && (head.method == Get) {
 
-                            let new_req = Self::build_req(&head.clone(), Self::copy_body(&whole_body));
-                            self.forward_to_server(&client_clone, new_req, n_retry + 1)
-                        } else {
+                                    let new_req = Self::build_req(&head.clone(), Self::copy_body(&whole_body));
+                                    self.forward_to_server(&client_clone, new_req, n_retry + 1)
+                                } else {
+                                    Box::new(FutureOk(Response::new().with_status(StatusCode::ServiceUnavailable)))
+                                }
+
+                            }
+                        }
+                    });
+                    Box::new(resp)
+                });
+                Box::new(r)
+            },
+            _ => {
+                info!("The request has a length enough big or unknown, so it's not possible to consume the body and retry");
+                let new_req = Self::build_req(&head.clone(), req.body());
+                let r = client_clone.request(new_req).then(move |result| {
+                    match result {
+                        Ok(client_resp) => Box::new(FutureOk(client_resp)),
+                        Err(e) => {
+                            error!("Connection error: {:?}", &e);
                             Box::new(FutureOk(Response::new().with_status(StatusCode::ServiceUnavailable)))
                         }
-
                     }
-                }
-            });
-            Box::new(resp)
-        });
-        Box::new(r)
+                });
+                Box::new(r)
+            }
+        }
+
     }
 
     fn build_req(head: &RequestHead, body: Chunk) -> Request {
@@ -225,34 +242,5 @@ impl Router {
 
     fn copy_body(chunk_ref: &Chunk) -> Chunk {
         Chunk::from(chunk_ref.as_ref().clone().to_vec())
-    }
-
-    fn with_new_host(&self, req: &mut Request) {
-        let host = self.host_resolver.clone().get_next();
-        let uri = Self::create_url(host.as_ref(), req.uri().clone())
-            .expect(&format!("Failed trying to parse uri. Origin: {:?}", &req.uri()));
-        req.set_uri(uri);
-    }
-
-    fn forward_to_server_stream(self, client: &Client<HttpConnector, Body>, mut req: Request<Body>) -> Box<Future<Error=hyper::Error, Item=Response>>
-    {
-
-        let client_clone = client.clone();
-        let ref_max = self.max_retry.clone();
-
-        self.with_new_host(&mut req);
-
-        info!("Attemp nique stream request for url: {:?}", req.uri());
-
-        let resp = client.request(req).then(move |result| {
-            match result {
-                Ok(client_resp) => Box::new(FutureOk(client_resp)),
-                Err(e) => {
-                    error!("Connection error: {:?}", &e);
-                    Box::new(FutureOk(Response::new().with_status(StatusCode::ServiceUnavailable)))
-                }
-            }
-        });
-        Box::new(resp)
     }
 }

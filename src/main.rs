@@ -25,6 +25,7 @@ mod router;
 mod server;
 mod host_resolver;
 mod cache;
+mod request_utils;
 
 use settings::Settings;
 use host_resolver::HostResolver;
